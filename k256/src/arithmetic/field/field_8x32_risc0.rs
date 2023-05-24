@@ -152,9 +152,7 @@ impl FieldElement8x32R0 {
                 | self.0[4]
                 | self.0[5]
                 | self.0[6]
-                | self.0[7]
-                | self.0[8]
-                | self.0[9])
+                | self.0[7])
                 == 0) as u8,
         )
     }
