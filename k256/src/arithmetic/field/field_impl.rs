@@ -8,11 +8,17 @@ use elliptic_curve::{
     zeroize::Zeroize,
 };
 
-#[cfg(target_pointer_width = "32")]
-use super::field_10x26::FieldElement10x26 as FieldElementUnsafeImpl;
-
-#[cfg(target_pointer_width = "64")]
-use super::field_5x52::FieldElement5x52 as FieldElementUnsafeImpl;
+cfg_if::cfg_if! {
+    if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+        use super::field_8x32_risc0::FieldElement8x32R0 as FieldElementUnsafeImpl;
+    } else if #[cfg(target_pointer_width = "32")] {
+        use super::field_10x26::FieldElement10x26 as FieldElementUnsafeImpl;
+    } else if #[cfg(target_pointer_width = "64")] {
+        use super::field_5x52::FieldElement5x52 as FieldElementUnsafeImpl;
+    } else {
+        compile_error!("unsupported target word size (i.e. target_pointer_width)");
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FieldElementImpl {

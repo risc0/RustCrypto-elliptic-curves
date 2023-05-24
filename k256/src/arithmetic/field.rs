@@ -5,7 +5,9 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(target_pointer_width = "32")] {
+    if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+        mod field_8x32_risc0;
+    } else if #[cfg(target_pointer_width = "32")] {
         mod field_10x26;
     } else if #[cfg(target_pointer_width = "64")] {
         mod field_5x52;
@@ -500,6 +502,8 @@ impl<'a> Product<&'a FieldElement> for FieldElement {
 mod tests {
     use elliptic_curve::ff::{Field, PrimeField};
     use num_bigint::{BigUint, ToBigUint};
+
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::prelude::*;
 
     use super::FieldElement;
@@ -706,6 +710,7 @@ mod tests {
         let _result = y.is_odd();
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     prop_compose! {
         fn field_element()(bytes in any::<[u8; 32]>()) -> FieldElement {
             let mut res = bytes_to_biguint(&bytes);
@@ -719,6 +724,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     proptest! {
 
         #[test]

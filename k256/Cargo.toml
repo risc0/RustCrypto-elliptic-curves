@@ -29,16 +29,22 @@ serdect = { version = "0.2", optional = true, default-features = false }
 sha2 = { version = "0.10", optional = true, default-features = false }
 signature = { version = "2", optional = true }
 
+[target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
+getrandom = { version = "0.2.9", features = ["custom"] }
+bytemuck = "1.13"
+
 [dev-dependencies]
 blobby = "0.3"
-criterion = "0.4"
 ecdsa-core = { version = "0.16", package = "ecdsa", default-features = false, features = ["dev"] }
 hex-literal = "0.4"
 num-bigint = "0.4"
 num-traits = "0.2"
-proptest = "1.1"
 rand_core = { version = "0.6", features = ["getrandom"] }
 sha3 = { version = "0.10", default-features = false }
+
+[target.'cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))'.dev-dependencies]
+proptest = "1.1"
+criterion = "0.4"
 
 [features]
 default = ["arithmetic", "ecdsa", "pkcs8", "precomputed-tables", "schnorr", "std"]

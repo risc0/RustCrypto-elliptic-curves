@@ -801,6 +801,8 @@ mod tests {
     };
     use num_bigint::{BigUint, ToBigUint};
     use num_traits::Zero;
+
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::prelude::*;
 
     impl From<&BigUint> for Scalar {
@@ -1091,12 +1093,14 @@ mod tests {
         assert!(!s.is_zero());
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     prop_compose! {
         fn scalar()(bytes in any::<[u8; 32]>()) -> Scalar {
             <Scalar as Reduce<U256>>::reduce_bytes(&bytes.into())
         }
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     proptest! {
         #[test]
         fn fuzzy_roundtrip_to_bytes(a in scalar()) {

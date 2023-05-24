@@ -284,6 +284,8 @@ mod tests {
         Curve,
     };
     use hex_literal::hex;
+
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::{num::u64::ANY, prelude::ProptestConfig, proptest};
 
     #[test]
@@ -400,6 +402,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     #[test]
     fn from_okm_fuzz() {
         let mut wide_order = GenericArray::default();
