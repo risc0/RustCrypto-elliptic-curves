@@ -6,6 +6,9 @@ mod wide;
 
 pub(crate) use self::wide::WideScalar;
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use elliptic_curve::bigint::risc0;
+
 use crate::{FieldBytes, Secp256k1, WideBytes, ORDER, ORDER_HEX};
 use core::{
     iter::{Product, Sum},
@@ -109,7 +112,11 @@ impl Scalar {
 
     /// Modulo multiplies two scalars.
     pub fn mul(&self, rhs: &Scalar) -> Scalar {
-        WideScalar::mul_wide(self, rhs).reduce()
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
+            Self(risc0::modmul_u256(&self.0, &rhs.0, &ORDER))
+        } else {
+            WideScalar::mul_wide(self, rhs).reduce()
+        }
     }
 
     /// Modulo squares the scalar.
