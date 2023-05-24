@@ -234,7 +234,7 @@ impl FieldElement8x32R0 {
         // will have timing invariant with any secrets. If the prover is faulty, this check may
         // leak secret information through timing, however this is out of scope since a faulty
         // cannot be relied upon for the privacy of the inputs.
-        assert!(bool::from(result.get_overflow()));
+        assert!(!bool::from(result.get_overflow()));
         result
     }
 
@@ -306,12 +306,30 @@ mod tests {
         "9FC3E90D2FAD03C8669F437A26374FA694CA76A7913C5E016322EBAA5C7616C5"
     ));
 
+    extern crate alloc;
+
+    fn as_hex(&elem: &F) -> alloc::string::String {
+        ::hex::encode_upper(elem.to_bytes())
+    }
+
     #[test]
     fn add() {
         let expected: F = F::from_bytes_unchecked(&hex!(
-            "9FC3E90D2FAD03C8669F437A26374FA694CA76A7913C5E016322EBAA5C7616C5"
+            "8BCCD3CFFB7C02214CAF7C56CA92F25B3A3655AD3495BCC044DFE7F3E4FFDC65"
         ));
-        assert_eq!(VAL_A.add(&VAL_B).0, expected.0,);
+        assert_eq!(as_hex(&VAL_A.add(&VAL_B)), as_hex(&expected));
+    }
+
+    // Tests the other "code path" returning the reduced or non-reduced result.
+    #[test]
+    fn add_negated() {
+        let expected: F = F::from_bytes_unchecked(&hex!(
+            "74332C300483FDDEB35083A9356D0DA4C5C9AA52CB6A433FBB20180B1B001FCA"
+        ));
+        assert_eq!(
+            as_hex(&VAL_A.negate(0).add(&VAL_B.negate(0))),
+            as_hex(&expected)
+        );
     }
 
     #[test]
@@ -319,8 +337,8 @@ mod tests {
         let expected: F = F::from_bytes_unchecked(&hex!(
             "13F7153D343101A719EFC7235BA45D4B5A9420FA5CA6A1411E4303B677763A60"
         ));
-        assert_eq!(VAL_A.negate(0).0, expected.0);
-        assert_eq!(VAL_A.add(&VAL_A.negate(0)).0, F::ZERO.0);
+        assert_eq!(as_hex(&VAL_A.negate(0)), as_hex(&expected));
+        assert_eq!(as_hex(&VAL_A.add(&VAL_A.negate(0))), as_hex(&F::ZERO));
     }
 
     #[test]
@@ -328,7 +346,28 @@ mod tests {
         let expected: F = F::from_bytes_unchecked(&hex!(
             "26B936E25A89EBAF821A46DC6BD8A0B1F0ED329412FA75FADF9A494D6F0EB4DB"
         ));
-        assert_eq!(VAL_A.mul(&VAL_B).0, expected.0);
+        assert_eq!(as_hex(&VAL_A.mul(&VAL_B)), as_hex(&expected));
+    }
+
+    #[test]
+    fn mul_zero() {
+        assert_eq!(as_hex(&VAL_A.mul(&F::ZERO)), as_hex(&F::ZERO));
+        assert_eq!(as_hex(&VAL_B.mul(&F::ZERO)), as_hex(&F::ZERO));
+        assert_eq!(as_hex(&F::ZERO.mul(&F::ZERO)), as_hex(&F::ZERO));
+        assert_eq!(as_hex(&F::ONE.mul(&F::ZERO)), as_hex(&F::ZERO));
+        assert_eq!(as_hex(&F::ONE.negate(0).mul(&F::ZERO)), as_hex(&F::ZERO));
+    }
+
+    #[test]
+    fn mul_one() {
+        assert_eq!(as_hex(&VAL_A.mul(&F::ONE)), as_hex(&VAL_A));
+        assert_eq!(as_hex(&VAL_B.mul(&F::ONE)), as_hex(&VAL_B));
+        assert_eq!(as_hex(&F::ZERO.mul(&F::ONE)), as_hex(&F::ZERO));
+        assert_eq!(as_hex(&F::ONE.mul(&F::ONE)), as_hex(&F::ONE));
+        assert_eq!(
+            as_hex(&F::ONE.negate(0).mul(&F::ONE)),
+            as_hex(&F::ONE.negate(0))
+        );
     }
 
     #[test]
@@ -336,6 +375,6 @@ mod tests {
         let expected: F = F::from_bytes_unchecked(&hex!(
             "111671376746955B968F48A94AFBACD243EA840AAE13EF85BC39AAE9552D8EDA"
         ));
-        assert_eq!(VAL_A.square().0, expected.0);
+        assert_eq!(as_hex(&VAL_A.square()), as_hex(&expected));
     }
 }
