@@ -298,11 +298,11 @@ dependencies = [
 
 [[package]]
 name = "crypto-bigint"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c2538c4e68e52548bacb3e83ac549f903d44f011ac9d5abb5e132e67d0808f7"
+version = "0.5.2"
+source = "git+https://github.com/risc0/RustCrypto-crypto-bigint?branch=victor/use-risc0-accel#725b3bcb26c3498ca4f2924f9e7f843d4bd3045f"
 dependencies = [
  "generic-array",
+ "getrandom",
  "rand_core",
  "subtle",
  "zeroize",

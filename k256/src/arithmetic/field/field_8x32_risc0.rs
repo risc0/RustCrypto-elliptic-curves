@@ -3,46 +3,14 @@
 
 use crate::FieldBytes;
 use elliptic_curve::{
+    bigint::{risc0, ArrayEncoding, Integer, Zero, U256},
     subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption},
     zeroize::Zeroize,
 };
 
-/// RISC Zero supports BigInt operations with a width of 256-bits as 8x32-bit words.
-const BIGINT_WIDTH_WORDS: usize = 8;
-const OP_MULTIPLY: u32 = 0;
-
-extern "C" {
-    fn sys_bigint(
-        result: *mut [u32; BIGINT_WIDTH_WORDS],
-        op: u32,
-        x: *const [u32; BIGINT_WIDTH_WORDS],
-        y: *const [u32; BIGINT_WIDTH_WORDS],
-        modulus: *const [u32; BIGINT_WIDTH_WORDS],
-    );
-}
-
-/// Adds two u32 values, a + b, returning (carry, result). Carry is in { 0u32, 1u32 }.
-#[inline(always)]
-const fn adc(a: u32, b: u32, carry: u32) -> (u32, u32) {
-    // TODO(victor): Check the compiler output for these methods.
-    let tmp = (a as u64).wrapping_add(b as u64).wrapping_add(carry as u64);
-    ((tmp >> 32) as u32, tmp as u32)
-}
-
-/// Subtracts two u32 values, a - b, returning (borrow, result). Borrow is in { 0u32, 1u32 }.
-#[inline(always)]
-const fn sbb(a: u32, b: u32, borrow: u32) -> (u32, u32) {
-    // TODO(victor): Check the compiler output for these methods.
-    let tmp = (a as u64)
-        .wrapping_sub(b as u64)
-        .wrapping_sub(borrow as u64);
-    ((tmp >> 63) as u32, tmp as u32)
-}
-
 /// Base field characteristic for secp256k1 as an 8x32 big integer, least to most significant.
-const SECP256K1_P: [u32; 8] = [
-    0xFFFFFC2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
-];
+const SECP256K1_P: U256 =
+    U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
 
 /// Scalars modulo SECP256k1 modulus (2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1).
 /// Uses 8 32-bit limbs (little-endian) and acceleration support from the RISC Zero rv32im impl.
@@ -52,30 +20,19 @@ const SECP256K1_P: [u32; 8] = [
 /// NOTE: This implementation will only run inside the RISC Zero guest. As a result, the
 /// requirements for constant-timeness are different than on a physical platform.
 #[derive(Clone, Copy, Debug)]
-pub struct FieldElement8x32R0(pub(crate) [u32; 8]);
+pub struct FieldElement8x32R0(pub(crate) U256);
 
 impl FieldElement8x32R0 {
     /// Zero element.
-    pub const ZERO: Self = Self([0, 0, 0, 0, 0, 0, 0, 0]);
+    pub const ZERO: Self = Self(U256::ZERO);
 
     /// Multiplicative identity.
-    pub const ONE: Self = Self([1, 0, 0, 0, 0, 0, 0, 0]);
+    pub const ONE: Self = Self(U256::ONE);
 
     /// Attempts to parse the given byte array as an SEC1-encoded field element.
     /// Does not check the result for being in the correct range.
     pub(crate) const fn from_bytes_unchecked(bytes: &[u8; 32]) -> Self {
-        // SEC1 encoding is most-to-least significant byte order.
-        // Convert to least to greatest word order.
-        let mut words = [0u32; 8];
-        let mut i = 0;
-        while i < 8 {
-            words[i] = (bytes[31 - i * 4] as u32)
-                + ((bytes[30 - i * 4] as u32) << 8)
-                + ((bytes[29 - i * 4] as u32) << 16)
-                + ((bytes[28 - i * 4] as u32) << 24);
-            i += 1;
-        }
-        Self(words)
+        Self(U256::from_be_slice(&bytes.as_slice()))
     }
 
     /// Attempts to parse the given byte array as an SEC1-encoded field element.
@@ -92,29 +49,22 @@ impl FieldElement8x32R0 {
     pub const fn from_u64(val: u64) -> Self {
         let w0 = val as u32;
         let w1 = (val >> 32) as u32;
-        Self([w0, w1, 0, 0, 0, 0, 0, 0])
+        Self(U256::from_words([w0, w1, 0, 0, 0, 0, 0, 0]))
     }
 
     /// Returns the SEC1 encoding of this field element.
     pub fn to_bytes(self) -> FieldBytes {
-        // SEC1 encoding is most-to-least significant byte order.
-        // Convert from least to greatest word order.
-        let mut r = FieldBytes::default();
-        for i in 0..8 {
-            r[i * 4 + 0] = (self.0[7 - i] >> 24) as u8;
-            r[i * 4 + 1] = (self.0[7 - i] >> 16) as u8;
-            r[i * 4 + 2] = (self.0[7 - i] >> 8) as u8;
-            r[i * 4 + 3] = self.0[7 - i] as u8;
-        }
-        r
+        self.0.to_be_byte_array()
     }
 
+    // TODO(victor): Benchmark to see if this is more efficient than ct_lt.
     /// Checks if the field element is greater or equal to the modulus.
     fn get_overflow(&self) -> Choice {
-        let m = self.0[2] & self.0[3] & self.0[4] & self.0[5] & self.0[6] & self.0[7];
+        let words = self.0.as_words();
+        let m = words[2] & words[3] & words[4] & words[5] & words[6] & words[7];
         let x = (m == 0xFFFFFFFFu32)
-            & ((self.0[1] == 0xFFFFFFFFu32)
-                | ((self.0[1] == 0xFFFFFFFEu32) & (self.0[0] >= 0xFFFFFC2Fu32)));
+            & ((words[1] == 0xFFFFFFFFu32)
+                | ((words[1] == 0xFFFFFFFEu32) & (words[0] >= 0xFFFFFC2Fu32)));
         Choice::from(x as u8)
     }
 
@@ -144,17 +94,7 @@ impl FieldElement8x32R0 {
     ///
     /// If zero, return `Choice(1)`.  Otherwise, return `Choice(0)`.
     pub fn is_zero(&self) -> Choice {
-        Choice::from(
-            ((self.0[0]
-                | self.0[1]
-                | self.0[2]
-                | self.0[3]
-                | self.0[4]
-                | self.0[5]
-                | self.0[6]
-                | self.0[7])
-                == 0) as u8,
-        )
+        self.0.is_zero()
     }
 
     /// Determine if this `FieldElement8x32R0` is odd in the SEC1 sense: `self mod 2 == 1`.
@@ -163,7 +103,7 @@ impl FieldElement8x32R0 {
     ///
     /// If odd, return `Choice(1)`.  Otherwise, return `Choice(0)`.
     pub fn is_odd(&self) -> Choice {
-        (self.0[0] as u8 & 1).into()
+        self.0.is_odd()
     }
 
     #[cfg(debug_assertions)]
@@ -174,81 +114,32 @@ impl FieldElement8x32R0 {
 
     /// Returns -self.
     pub const fn negate(&self, _magnitude: u32) -> Self {
-        let (b0, n0) = sbb(SECP256K1_P[0], self.0[0], 0);
-        let (b1, n1) = sbb(SECP256K1_P[1], self.0[1], b0);
-        let (b2, n2) = sbb(SECP256K1_P[2], self.0[2], b1);
-        let (b3, n3) = sbb(SECP256K1_P[3], self.0[3], b2);
-        let (b4, n4) = sbb(SECP256K1_P[4], self.0[4], b3);
-        let (b5, n5) = sbb(SECP256K1_P[5], self.0[5], b4);
-        let (b6, n6) = sbb(SECP256K1_P[6], self.0[6], b5);
-        let (b7, n7) = sbb(SECP256K1_P[7], self.0[7], b6);
-        debug_assert!(b7 == 0);
-        Self([n0, n1, n2, n3, n4, n5, n6, n7])
+        Self(SECP256K1_P.sub_mod(&self.0, &SECP256K1_P))
     }
 
     /// Returns self + rhs mod p.
     /// Sums the magnitudes.
     pub fn add(&self, rhs: &Self) -> Self {
-        // Add the left and right hand sides, propogating carries.
-        let (c0, a0) = adc(self.0[0], rhs.0[0], 0);
-        let (c1, a1) = adc(self.0[1], rhs.0[1], c0);
-        let (c2, a2) = adc(self.0[2], rhs.0[2], c1);
-        let (c3, a3) = adc(self.0[3], rhs.0[3], c2);
-        let (c4, a4) = adc(self.0[4], rhs.0[4], c3);
-        let (c5, a5) = adc(self.0[5], rhs.0[5], c4);
-        let (c6, a6) = adc(self.0[6], rhs.0[6], c5);
-        let (c7, a7) = adc(self.0[7], rhs.0[7], c6);
-
-        // Subtract the modulus from the addition result, propogating borrows.
-        // NOTE: Because this is a constant-time algorithm, the subtract must always occur.
-        let (b0, s0) = sbb(a0, SECP256K1_P[0], 0);
-        let (b1, s1) = sbb(a1, SECP256K1_P[1], b0);
-        let (b2, s2) = sbb(a2, SECP256K1_P[2], b1);
-        let (b3, s3) = sbb(a3, SECP256K1_P[3], b2);
-        let (b4, s4) = sbb(a4, SECP256K1_P[4], b3);
-        let (b5, s5) = sbb(a5, SECP256K1_P[5], b4);
-        let (b6, s6) = sbb(a6, SECP256K1_P[6], b5);
-        let (b7, s7) = sbb(a7, SECP256K1_P[7], b6);
-
-        // If the subtraction underflowed, then use the addition result.
-        let underflow = Choice::from((b7 - c7) as u8);
-        Self::conditional_select(
-            &Self([s0, s1, s2, s3, s4, s5, s6, s7]),
-            &Self([a0, a1, a2, a3, a4, a5, a6, a7]),
-            underflow,
-        )
-    }
-
-    #[inline(always)]
-    fn mul_inner(&self, rhs: &Self) -> Self {
-        let result = Self(unsafe {
-            let mut out = core::mem::MaybeUninit::<[u32; 8]>::uninit();
-            sys_bigint(out.as_mut_ptr(), OP_MULTIPLY, &self.0, &rhs.0, &SECP256K1_P);
-            out.assume_init()
-        });
-        // Assert that the Prover returned the canonical representation of the result, i.e. that it
-        // is fully reduced and has no multiples of the modulus included.
-        // NOTE: On a cooperating prover, this check will always evaluate to false, and therefore
-        // will have timing invariant with any secrets. If the prover is faulty, this check may
-        // leak secret information through timing, however this is out of scope since a faulty
-        // cannot be relied upon for the privacy of the inputs.
-        assert!(!bool::from(result.get_overflow()));
-        result
+        Self(self.0.add_mod(&rhs.0, &SECP256K1_P))
     }
 
     /// Returns self * rhs mod p
     pub fn mul(&self, rhs: &Self) -> Self {
-        self.mul_inner(rhs)
+        Self(risc0::modmul_u256(&self.0, &rhs.0, &SECP256K1_P))
     }
 
     /// Multiplies by a single-limb integer.
     pub fn mul_single(&self, rhs: u32) -> Self {
-        self.mul_inner(&Self([rhs, 0, 0, 0, 0, 0, 0, 0]))
+        Self(risc0::modmul_u256(
+            &self.0,
+            &U256::from_words([rhs, 0, 0, 0, 0, 0, 0, 0]),
+            &SECP256K1_P,
+        ))
     }
 
     /// Returns self * self
     pub fn square(&self) -> Self {
-        self.mul_inner(self)
+        Self(risc0::modmul_u256(&self.0, &self.0, &SECP256K1_P))
     }
 }
 
@@ -260,29 +151,13 @@ impl Default for FieldElement8x32R0 {
 
 impl ConditionallySelectable for FieldElement8x32R0 {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Self([
-            u32::conditional_select(&a.0[0], &b.0[0], choice),
-            u32::conditional_select(&a.0[1], &b.0[1], choice),
-            u32::conditional_select(&a.0[2], &b.0[2], choice),
-            u32::conditional_select(&a.0[3], &b.0[3], choice),
-            u32::conditional_select(&a.0[4], &b.0[4], choice),
-            u32::conditional_select(&a.0[5], &b.0[5], choice),
-            u32::conditional_select(&a.0[6], &b.0[6], choice),
-            u32::conditional_select(&a.0[7], &b.0[7], choice),
-        ])
+        Self(U256::conditional_select(&a.0, &b.0, choice))
     }
 }
 
 impl ConstantTimeEq for FieldElement8x32R0 {
     fn ct_eq(&self, other: &Self) -> Choice {
-        self.0[0].ct_eq(&other.0[0])
-            & self.0[1].ct_eq(&other.0[1])
-            & self.0[2].ct_eq(&other.0[2])
-            & self.0[3].ct_eq(&other.0[3])
-            & self.0[4].ct_eq(&other.0[4])
-            & self.0[5].ct_eq(&other.0[5])
-            & self.0[6].ct_eq(&other.0[6])
-            & self.0[7].ct_eq(&other.0[7])
+        self.0.ct_eq(&other.0)
     }
 }
 
