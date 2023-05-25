@@ -16,4 +16,8 @@ opt-level = 2
 
 [patch.crates-io.crypto-bigint]
 git = "https://github.com/risc0/RustCrypto-crypto-bigint"
-branch = "victor/use-risc0-accel"
+branch = "victor/use-risc0-accel" # DO NOT MERGE: Use a tag instead.
+
+[patch.crates-io.sha2]
+git = "https://github.com/risc0/RustCrypto-hashes"
+tag = "sha2-v0.10.6-risc0"
