@@ -112,10 +112,12 @@ impl Scalar {
 
     /// Modulo multiplies two scalars.
     pub fn mul(&self, rhs: &Scalar) -> Scalar {
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            Self(risc0::modmul_u256(&self.0, &rhs.0, &ORDER))
-        } else {
-            WideScalar::mul_wide(self, rhs).reduce()
+        cfg_if::cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+                Self(risc0::modmul_u256(&self.0, &rhs.0, &ORDER))
+            } else {
+                WideScalar::mul_wide(self, rhs).reduce()
+            }
         }
     }
 

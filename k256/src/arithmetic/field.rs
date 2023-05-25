@@ -22,7 +22,9 @@ cfg_if! {
         use field_impl::FieldElementImpl;
     } else {
         cfg_if! {
-            if #[cfg(target_pointer_width = "32")] {
+            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+                use field_8x32_risc0::FieldElement8x32R0 as FieldElementImpl;
+            } else if #[cfg(target_pointer_width = "32")] {
                 use field_10x26::FieldElement10x26 as FieldElementImpl;
             } else if #[cfg(target_pointer_width = "64")] {
                 use field_5x52::FieldElement5x52 as FieldElementImpl;
