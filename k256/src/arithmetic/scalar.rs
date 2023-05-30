@@ -440,6 +440,7 @@ impl Invert for Scalar {
     /// variable-time operation can potentially leak secrets through
     /// sidechannels.
     #[allow(non_snake_case)]
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn invert_vartime(&self) -> CtOption<Self> {
         let mut u = *self;
         let mut v = Self::from_uint_unchecked(Secp256k1::ORDER);
@@ -484,6 +485,12 @@ impl Invert for Scalar {
         }
 
         CtOption::new(C, !self.is_zero())
+    }
+
+    // Constant time algorithm, based on multiplications, is faster in the zkVM.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn invert_vartime(&self) -> CtOption<Self> {
+        self.invert()
     }
 }
 

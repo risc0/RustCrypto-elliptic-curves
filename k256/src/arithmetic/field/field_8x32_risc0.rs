@@ -3,7 +3,7 @@
 
 use crate::FieldBytes;
 use elliptic_curve::{
-    bigint::{risc0, ArrayEncoding, Integer, Zero, U256},
+    bigint::{risc0, ArrayEncoding, Integer, Limb, Zero, U256},
     subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption},
     zeroize::Zeroize,
 };
@@ -57,7 +57,6 @@ impl FieldElement8x32R0 {
         self.0.to_be_byte_array()
     }
 
-    // TODO(victor): Benchmark to see if this is more efficient than ct_lt.
     /// Checks if the field element is greater or equal to the modulus.
     fn get_overflow(&self) -> Choice {
         let words = self.0.as_words();
@@ -69,23 +68,22 @@ impl FieldElement8x32R0 {
     }
 
     /// Brings the field element's magnitude to 1, but does not necessarily normalize it.
-    /// NOTE: In 8x32 RISC Zero representation, this is a no-op.
     #[inline(always)]
     pub fn normalize_weak(&self) -> Self {
         self.normalize()
     }
 
     /// Returns the fully normalized and canonical representation of the value.
-    /// NOTE: In 8x32 RISC Zero representation, this is a no-op.
     #[inline(always)]
     pub fn normalize(&self) -> Self {
+        // When the prover is cooperative, the value is always normalized.
+        assert!(!bool::from(self.get_overflow()));
         self.clone()
     }
 
     /// Checks if the field element becomes zero if normalized.
-    /// NOTE: In 8x32 RISC Zero representation, this is a equivalent to self.is_zero().
     pub fn normalizes_to_zero(&self) -> Choice {
-        self.is_zero()
+        self.normalize().is_zero()
     }
 
     /// Determine if this `FieldElement8x32R0` is zero.
@@ -98,6 +96,8 @@ impl FieldElement8x32R0 {
     }
 
     /// Determine if this `FieldElement8x32R0` is odd in the SEC1 sense: `self mod 2 == 1`.
+    ///
+    /// Value must be normalized before calling is_odd.
     ///
     /// # Returns
     ///
@@ -114,23 +114,38 @@ impl FieldElement8x32R0 {
 
     /// Returns -self.
     pub const fn negate(&self, _magnitude: u32) -> Self {
-        Self(SECP256K1_P.sub_mod(&self.0, &SECP256K1_P))
+        let (s, borrow) = SECP256K1_P.sbb(&self.0, Limb(0));
+        assert!(borrow.0 == 0);
+        Self(s)
     }
 
     /// Returns self + rhs mod p.
     /// Sums the magnitudes.
     pub fn add(&self, rhs: &Self) -> Self {
-        Self(self.0.add_mod(&rhs.0, &SECP256K1_P))
+        let (a, carry) = self.0.adc(&rhs.0, Limb(0));
+
+        // If a carry or overflow of the modulus occured, we need to add 2^256 - p.
+        // c0 and c1 and the two non-zero limbs of the correction value.
+        let mask = u32::conditional_select(&carry.0, &1, Self(a).get_overflow());
+        let c0 = U256::ZERO.wrapping_sub(&SECP256K1_P).as_words()[0] * mask;
+        let c1 = U256::ZERO.wrapping_sub(&SECP256K1_P).as_words()[1] * mask;
+        let correction = U256::from_words([c0, c1, 0, 0, 0, 0, 0, 0]);
+
+        Self(a.wrapping_add(&correction))
     }
 
     /// Returns self * rhs mod p
     pub fn mul(&self, rhs: &Self) -> Self {
-        Self(risc0::modmul_u256(&self.0, &rhs.0, &SECP256K1_P))
+        Self(risc0::modmul_u256_denormalized(
+            &self.0,
+            &rhs.0,
+            &SECP256K1_P,
+        ))
     }
 
     /// Multiplies by a single-limb integer.
     pub fn mul_single(&self, rhs: u32) -> Self {
-        Self(risc0::modmul_u256(
+        Self(risc0::modmul_u256_denormalized(
             &self.0,
             &U256::from_words([rhs, 0, 0, 0, 0, 0, 0, 0]),
             &SECP256K1_P,
@@ -139,7 +154,11 @@ impl FieldElement8x32R0 {
 
     /// Returns self * self
     pub fn square(&self) -> Self {
-        Self(risc0::modmul_u256(&self.0, &self.0, &SECP256K1_P))
+        Self(risc0::modmul_u256_denormalized(
+            &self.0,
+            &self.0,
+            &SECP256K1_P,
+        ))
     }
 }
 
