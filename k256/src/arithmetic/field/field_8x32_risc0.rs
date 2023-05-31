@@ -9,8 +9,12 @@ use elliptic_curve::{
 };
 
 /// Base field characteristic for secp256k1 as an 8x32 big integer, least to most significant.
-const SECP256K1_P: U256 =
+const MODULUS: U256 =
     U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+
+/// Low two words of 2^256 - MODULUS, used for correcting the value after addition mod 2^256.
+const MODULUS_CORRECTION_0: u32 = U256::ZERO.wrapping_sub(&MODULUS).as_words()[0];
+const MODULUS_CORRECTION_1: u32 = U256::ZERO.wrapping_sub(&MODULUS).as_words()[1];
 
 /// Scalars modulo SECP256k1 modulus (2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1).
 /// Uses 8 32-bit limbs (little-endian) and acceleration support from the RISC Zero rv32im impl.
@@ -94,7 +98,7 @@ impl FieldElement8x32R0 {
 
     /// Checks if the field element becomes zero if normalized.
     pub fn normalizes_to_zero(&self) -> Choice {
-        self.0.ct_eq(&U256::ZERO) | self.0.ct_eq(&SECP256K1_P)
+        self.0.ct_eq(&U256::ZERO) | self.0.ct_eq(&MODULUS)
     }
 
     /// Determine if this `FieldElement8x32R0` is zero.
@@ -125,7 +129,7 @@ impl FieldElement8x32R0 {
 
     /// Returns -self.
     const fn negate_const(&self) -> Self {
-        let (s, borrow) = SECP256K1_P.sbb(&self.0, Limb(0));
+        let (s, borrow) = MODULUS.sbb(&self.0, Limb(0));
         assert!(borrow.0 == 0);
         Self(s)
     }
@@ -142,9 +146,10 @@ impl FieldElement8x32R0 {
 
         // If a carry or overflow of the modulus occured, we need to add 2^256 - p.
         // c0 and c1 and the two non-zero limbs of the correction value.
-        let mask = u32::conditional_select(&carry.0, &1, Self(a).get_overflow());
-        let c0 = U256::ZERO.wrapping_sub(&SECP256K1_P).as_words()[0] * mask;
-        let c1 = U256::ZERO.wrapping_sub(&SECP256K1_P).as_words()[1] * mask;
+        let denorm = Self(a).get_overflow().unwrap_u8() as u32;
+        let mask = carry.0 | denorm;
+        let c0 = MODULUS_CORRECTION_0 * mask;
+        let c1 = MODULUS_CORRECTION_1 * mask;
         let correction = U256::from_words([c0, c1, 0, 0, 0, 0, 0, 0]);
 
         Self(a.wrapping_add(&correction))
@@ -152,11 +157,7 @@ impl FieldElement8x32R0 {
 
     /// Returns self * rhs mod p
     pub fn mul(&self, rhs: &Self) -> Self {
-        Self(risc0::modmul_u256_denormalized(
-            &self.0,
-            &rhs.0,
-            &SECP256K1_P,
-        ))
+        Self(risc0::modmul_u256_denormalized(&self.0, &rhs.0, &MODULUS))
     }
 
     /// Multiplies by a single-limb integer.
@@ -164,17 +165,13 @@ impl FieldElement8x32R0 {
         Self(risc0::modmul_u256_denormalized(
             &self.0,
             &U256::from_words([rhs, 0, 0, 0, 0, 0, 0, 0]),
-            &SECP256K1_P,
+            &MODULUS,
         ))
     }
 
     /// Returns self * self
     pub fn square(&self) -> Self {
-        Self(risc0::modmul_u256_denormalized(
-            &self.0,
-            &self.0,
-            &SECP256K1_P,
-        ))
+        Self(risc0::modmul_u256_denormalized(&self.0, &self.0, &MODULUS))
     }
 }
 
