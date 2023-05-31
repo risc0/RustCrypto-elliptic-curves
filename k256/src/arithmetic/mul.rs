@@ -56,9 +56,26 @@ use once_cell::sync::Lazy;
 
 /// Lookup table containing precomputed values `[p, 2p, 3p, ..., 8p]`
 #[derive(Copy, Clone, Default)]
-#[cfg_attr(all(target_os = "zkvm", target_arch = "riscv32"), repr(align(1024)))]
+#[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+struct LookupTable([ProjectivePoint; 8]);
+
+#[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+impl From<&ProjectivePoint> for LookupTable {
+    fn from(p: &ProjectivePoint) -> Self {
+        let mut points = [*p; 8];
+        for j in 0..7 {
+            points[j + 1] = p + &points[j];
+        }
+        LookupTable(points)
+    }
+}
+/// Lookup table containing precomputed values `[p, 2p, 3p, ..., 8p]`
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+#[repr(align(1024))]
+#[derive(Copy, Clone, Default)]
 struct LookupTable([ProjectivePoint; 9]);
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
 impl From<&ProjectivePoint> for LookupTable {
     fn from(p: &ProjectivePoint) -> Self {
         let mut points = [*p; 9];
@@ -95,7 +112,7 @@ impl LookupTable {
         let mut t = ProjectivePoint::IDENTITY;
         for j in 1..9 {
             let c = (xabs as u8).ct_eq(&(j as u8));
-            t.conditional_assign(&self.0[j], c);
+            t.conditional_assign(&self.0[j - 1], c);
         }
         // Now t == |x| * p.
 
