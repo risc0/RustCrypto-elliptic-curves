@@ -107,6 +107,12 @@ impl FieldElement {
         Self(FieldElementImpl::from_u64(w))
     }
 
+    /// Convert a `i64` to a field element.
+    /// Returned value may be only weakly normalized.
+    pub const fn from_i64(w: i64) -> Self {
+        Self(FieldElementImpl::from_i64(w))
+    }
+
     /// Returns the SEC1 encoding of this field element.
     pub fn to_bytes(self) -> FieldBytes {
         self.0.normalize().to_bytes()

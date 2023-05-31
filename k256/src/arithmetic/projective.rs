@@ -173,13 +173,14 @@ impl ProjectivePoint {
             let yy_m_bzz3 = yy + &bzz3.negate(1);
             let yy_p_bzz3 = yy + &bzz3;
 
-            let byz3 = &yz_pairs.mul_single(CURVE_EQUATION_B_SINGLE * 3);
+            let n_byz3 =
+                &yz_pairs.mul(&FieldElement::from_i64(CURVE_EQUATION_B_SINGLE as i64 * -3));
 
             let xx3 = xx.mul_single(3);
             let bxx9 = xx3.mul_single(CURVE_EQUATION_B_SINGLE * 3);
 
             let mut ret = ProjectivePoint {
-                x: (xy_pairs * &yy_m_bzz3) + &(byz3 * &xz_pairs).negate(1),
+                x: (xy_pairs * &yy_m_bzz3) + &(n_byz3 * &xz_pairs),
                 y: (yy_p_bzz3 * &yy_m_bzz3) + &(bxx9 * &xz_pairs),
                 z: (yz_pairs * &yy_p_bzz3) + &(xx3 * &xy_pairs),
             };
@@ -227,9 +228,9 @@ impl ProjectivePoint {
             // Same as below, but using mul_single instead of repeated addition to get small
             // multiplications and normalize_weak is removed.
             let bzz3 = zz.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-            let bzz9 = bzz3.mul_single(3);
+            let n_bzz9 = zz.mul(&FieldElement::from_i64(CURVE_EQUATION_B_SINGLE as i64 * -9));
 
-            let yy_m_bzz9 = yy + &bzz9.negate(1);
+            let yy_m_bzz9 = yy + &n_bzz9;
             let yy_p_bzz3 = yy + &bzz3;
 
             let yy_zz = yy * &zz;

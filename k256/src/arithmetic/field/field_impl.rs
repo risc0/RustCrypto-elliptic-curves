@@ -76,6 +76,12 @@ impl FieldElementImpl {
         Self::new_normalized(&FieldElementUnsafeImpl::from_u64(val))
     }
 
+    /// Convert a `i64` to a field element.
+    /// Returned value may be only weakly normalized.
+    pub(crate) const fn from_i64(w: i64) -> Self {
+        Self::new_weak_normalized(&FieldElementUnsafeImpl::from_i64(w))
+    }
+
     pub fn from_bytes(bytes: &FieldBytes) -> CtOption<Self> {
         let value = FieldElementUnsafeImpl::from_bytes(bytes);
         CtOption::map(value, |x| Self::new_normalized(&x))

@@ -52,6 +52,14 @@ impl FieldElement8x32R0 {
         Self(U256::from_words([w0, w1, 0, 0, 0, 0, 0, 0]))
     }
 
+    pub const fn from_i64(val: i64) -> Self {
+        // Compute val_abs = |val|
+        let val_mask = val >> 63;
+        let val_abs = ((val + val_mask) ^ val_mask) as u64;
+
+        Self::from_u64(val_abs).negate_const()
+    }
+
     /// Returns the SEC1 encoding of this field element.
     pub fn to_bytes(self) -> FieldBytes {
         self.0.to_be_byte_array()
@@ -86,7 +94,7 @@ impl FieldElement8x32R0 {
 
     /// Checks if the field element becomes zero if normalized.
     pub fn normalizes_to_zero(&self) -> Choice {
-        self.normalize().is_zero()
+        self.0.ct_eq(&U256::ZERO) | self.0.ct_eq(&SECP256K1_P)
     }
 
     /// Determine if this `FieldElement8x32R0` is zero.
@@ -116,10 +124,15 @@ impl FieldElement8x32R0 {
     }
 
     /// Returns -self.
-    pub const fn negate(&self, _magnitude: u32) -> Self {
+    const fn negate_const(&self) -> Self {
         let (s, borrow) = SECP256K1_P.sbb(&self.0, Limb(0));
         assert!(borrow.0 == 0);
         Self(s)
+    }
+
+    /// Returns -self.
+    pub fn negate(&self, _magnitude: u32) -> Self {
+        self.mul(&Self::ONE.negate_const())
     }
 
     /// Returns self + rhs mod p.
