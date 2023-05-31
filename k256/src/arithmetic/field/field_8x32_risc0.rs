@@ -68,9 +68,12 @@ impl FieldElement8x32R0 {
     }
 
     /// Brings the field element's magnitude to 1, but does not necessarily normalize it.
+    ///
+    /// NOTE: In RISC Zero, this is a no-op since weak normalization is not an operation that
+    /// needs to be performed between calls to arithmetic routines.
     #[inline(always)]
     pub fn normalize_weak(&self) -> Self {
-        self.normalize()
+        self.clone()
     }
 
     /// Returns the fully normalized and canonical representation of the value.

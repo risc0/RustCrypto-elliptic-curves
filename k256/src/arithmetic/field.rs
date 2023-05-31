@@ -144,7 +144,13 @@ impl FieldElement {
     /// Returns 2*self.
     /// Doubles the magnitude.
     pub fn double(&self) -> Self {
-        Self(self.0.add(&(self.0)))
+        cfg_if::cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+                self.mul_single(2)
+            } else {
+                Self(self.0.add(&(self.0)))
+            }
+        }
     }
 
     /// Returns self * rhs mod p
