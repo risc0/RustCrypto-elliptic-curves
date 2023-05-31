@@ -144,7 +144,7 @@ impl FieldElement8x32R0 {
     pub fn add(&self, rhs: &Self) -> Self {
         let (a, carry) = self.0.adc(&rhs.0, Limb(0));
 
-        // If a carry or overflow of the modulus occured, we need to add 2^256 - p.
+        // If a carry or overflow of the modulus occurred, we need to add 2^256 - p.
         // c0 and c1 and the two non-zero limbs of the correction value.
         let denorm = Self(a).get_overflow().unwrap_u8() as u32;
         let mask = carry.0 | denorm;
