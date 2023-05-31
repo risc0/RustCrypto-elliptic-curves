@@ -56,12 +56,14 @@ use once_cell::sync::Lazy;
 
 /// Lookup table containing precomputed values `[p, 2p, 3p, ..., 8p]`
 #[derive(Copy, Clone, Default)]
-struct LookupTable([ProjectivePoint; 8]);
+#[cfg_attr(all(target_os = "zkvm", target_arch = "riscv32"), repr(align(1024)))]
+struct LookupTable([ProjectivePoint; 9]);
 
 impl From<&ProjectivePoint> for LookupTable {
     fn from(p: &ProjectivePoint) -> Self {
-        let mut points = [*p; 8];
-        for j in 0..7 {
+        let mut points = [*p; 9];
+        points[0] = ProjectivePoint::IDENTITY;
+        for j in 1..8 {
             points[j + 1] = p + &points[j];
         }
         LookupTable(points)
@@ -78,11 +80,22 @@ impl LookupTable {
         let xmask = x >> 7;
         let xabs = (x + xmask) ^ xmask;
 
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
+            // All paged-in memory is constant time to access in RISC Zero.
+            // LookupTable fits in 864 bytes, which is less than the page size of 1024. Adding the
+            // repr(align(1024)) attribute above ensure the struct is placed on a page boundary and
+            // so all accesses within the table will result in the same paging behavior.
+            let value = self.0[xabs as usize];
+
+            let neg_mask = Choice::from((xmask & 1) as u8);
+            return ProjectivePoint::conditional_select(&value, &-value, neg_mask);
+        }
+
         // Get an array element in constant time
         let mut t = ProjectivePoint::IDENTITY;
         for j in 1..9 {
             let c = (xabs as u8).ct_eq(&(j as u8));
-            t.conditional_assign(&self.0[j - 1], c);
+            t.conditional_assign(&self.0[j], c);
         }
         // Now t == |x| * p.
 
