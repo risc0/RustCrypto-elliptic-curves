@@ -366,6 +366,12 @@ impl From<u64> for FieldElement {
     }
 }
 
+impl From<i64> for FieldElement {
+    fn from(k: i64) -> Self {
+        Self(FieldElementImpl::from_i64(k))
+    }
+}
+
 impl PartialEq for FieldElement {
     fn eq(&self, other: &Self) -> bool {
         self.0.ct_eq(&(other.0)).into()

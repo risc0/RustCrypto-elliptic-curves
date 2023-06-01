@@ -114,7 +114,19 @@ impl Scalar {
     pub fn mul(&self, rhs: &Scalar) -> Scalar {
         cfg_if::cfg_if! {
             if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
-                Self(risc0::modmul_u256(&self.0, &rhs.0, &ORDER))
+                let result = Self(risc0::modmul_u256_denormalized(&self.0, &rhs.0, &ORDER));
+                assert!(bool::from(result.0.ct_lt(&ORDER)));
+                result
+            } else {
+                WideScalar::mul_wide(self, rhs).reduce()
+            }
+        }
+    }
+
+    fn mul_denormalized(&self, rhs: &Scalar) -> Scalar {
+        cfg_if::cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+                Self(risc0::modmul_u256_denormalized(&self.0, &rhs.0, &ORDER))
             } else {
                 WideScalar::mul_wide(self, rhs).reduce()
             }
@@ -124,6 +136,19 @@ impl Scalar {
     /// Modulo squares the scalar.
     pub fn square(&self) -> Self {
         self.mul(self)
+    }
+
+    fn square_denormalized(&self) -> Self {
+        self.mul_denormalized(self)
+    }
+
+    #[inline(always)]
+    fn normalize(&self) -> Self {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            assert!(bool::from(self.0.ct_lt(&ORDER)));
+        }
+        self.clone()
     }
 
     /// Right shifts the scalar.
@@ -139,49 +164,49 @@ impl Scalar {
         // https://briansmith.org/ecc-inversion-addition-chains-01#secp256k1_scalar_inversion
         let x_1 = *self;
         let x_10 = self.pow2k(1);
-        let x_11 = x_10.mul(&x_1);
-        let x_101 = x_10.mul(&x_11);
-        let x_111 = x_10.mul(&x_101);
-        let x_1001 = x_10.mul(&x_111);
-        let x_1011 = x_10.mul(&x_1001);
-        let x_1101 = x_10.mul(&x_1011);
+        let x_11 = x_10.mul_denormalized(&x_1);
+        let x_101 = x_10.mul_denormalized(&x_11);
+        let x_111 = x_10.mul_denormalized(&x_101);
+        let x_1001 = x_10.mul_denormalized(&x_111);
+        let x_1011 = x_10.mul_denormalized(&x_1001);
+        let x_1101 = x_10.mul_denormalized(&x_1011);
 
-        let x6 = x_1101.pow2k(2).mul(&x_1011);
-        let x8 = x6.pow2k(2).mul(&x_11);
-        let x14 = x8.pow2k(6).mul(&x6);
-        let x28 = x14.pow2k(14).mul(&x14);
-        let x56 = x28.pow2k(28).mul(&x28);
+        let x6 = x_1101.pow2k(2).mul_denormalized(&x_1011);
+        let x8 = x6.pow2k(2).mul_denormalized(&x_11);
+        let x14 = x8.pow2k(6).mul_denormalized(&x6);
+        let x28 = x14.pow2k(14).mul_denormalized(&x14);
+        let x56 = x28.pow2k(28).mul_denormalized(&x28);
 
         #[rustfmt::skip]
             let res = x56
-            .pow2k(56).mul(&x56)
-            .pow2k(14).mul(&x14)
-            .pow2k(3).mul(&x_101)
-            .pow2k(4).mul(&x_111)
-            .pow2k(4).mul(&x_101)
-            .pow2k(5).mul(&x_1011)
-            .pow2k(4).mul(&x_1011)
-            .pow2k(4).mul(&x_111)
-            .pow2k(5).mul(&x_111)
-            .pow2k(6).mul(&x_1101)
-            .pow2k(4).mul(&x_101)
-            .pow2k(3).mul(&x_111)
-            .pow2k(5).mul(&x_1001)
-            .pow2k(6).mul(&x_101)
-            .pow2k(10).mul(&x_111)
-            .pow2k(4).mul(&x_111)
-            .pow2k(9).mul(&x8)
-            .pow2k(5).mul(&x_1001)
-            .pow2k(6).mul(&x_1011)
-            .pow2k(4).mul(&x_1101)
-            .pow2k(5).mul(&x_11)
-            .pow2k(6).mul(&x_1101)
-            .pow2k(10).mul(&x_1101)
-            .pow2k(4).mul(&x_1001)
-            .pow2k(6).mul(&x_1)
-            .pow2k(8).mul(&x6);
+            .pow2k(56).mul_denormalized(&x56)
+            .pow2k(14).mul_denormalized(&x14)
+            .pow2k(3).mul_denormalized(&x_101)
+            .pow2k(4).mul_denormalized(&x_111)
+            .pow2k(4).mul_denormalized(&x_101)
+            .pow2k(5).mul_denormalized(&x_1011)
+            .pow2k(4).mul_denormalized(&x_1011)
+            .pow2k(4).mul_denormalized(&x_111)
+            .pow2k(5).mul_denormalized(&x_111)
+            .pow2k(6).mul_denormalized(&x_1101)
+            .pow2k(4).mul_denormalized(&x_101)
+            .pow2k(3).mul_denormalized(&x_111)
+            .pow2k(5).mul_denormalized(&x_1001)
+            .pow2k(6).mul_denormalized(&x_101)
+            .pow2k(10).mul_denormalized(&x_111)
+            .pow2k(4).mul_denormalized(&x_111)
+            .pow2k(9).mul_denormalized(&x8)
+            .pow2k(5).mul_denormalized(&x_1001)
+            .pow2k(6).mul_denormalized(&x_1011)
+            .pow2k(4).mul_denormalized(&x_1101)
+            .pow2k(5).mul_denormalized(&x_11)
+            .pow2k(6).mul_denormalized(&x_1101)
+            .pow2k(10).mul_denormalized(&x_1101)
+            .pow2k(4).mul_denormalized(&x_1001)
+            .pow2k(6).mul_denormalized(&x_1)
+            .pow2k(8).mul_denormalized(&x6);
 
-        CtOption::new(res, !self.is_zero())
+        CtOption::new(res.normalize(), !self.is_zero())
     }
 
     /// Returns the scalar modulus as a `BigUint` object.
@@ -223,7 +248,7 @@ impl Scalar {
     fn pow2k(&self, k: usize) -> Self {
         let mut x = *self;
         for _j in 0..k {
-            x = x.square();
+            x = x.square_denormalized();
         }
         x
     }
