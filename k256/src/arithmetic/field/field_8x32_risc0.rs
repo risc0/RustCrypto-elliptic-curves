@@ -71,12 +71,10 @@ impl FieldElement8x32R0 {
 
     /// Checks if the field element is greater or equal to the modulus.
     fn get_overflow(&self) -> Choice {
-        let words = self.0.as_words();
-        let m = words[2] & words[3] & words[4] & words[5] & words[6] & words[7];
-        let x = (m == 0xFFFFFFFFu32)
-            & ((words[1] == 0xFFFFFFFFu32)
-                | ((words[1] == 0xFFFFFFFEu32) & (words[0] >= 0xFFFFFC2Fu32)));
-        Choice::from(x as u8)
+        let limbs = self.0.as_limbs();
+        let (_, c0) = limbs[0].adc(Limb(MODULUS_CORRECTION_0), Limb(0));
+        let (_, c1) = limbs[1].adc(Limb(MODULUS_CORRECTION_0), c0);
+        Choice::from(c1.0 as u8)
     }
 
     /// Brings the field element's magnitude to 1, but does not necessarily normalize it.
