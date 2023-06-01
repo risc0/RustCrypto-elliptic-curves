@@ -13,8 +13,7 @@ const MODULUS: U256 =
     U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
 
 /// Low two words of 2^256 - MODULUS, used for correcting the value after addition mod 2^256.
-const MODULUS_CORRECTION_0: u32 = U256::ZERO.wrapping_sub(&MODULUS).as_words()[0];
-const MODULUS_CORRECTION_1: u32 = U256::ZERO.wrapping_sub(&MODULUS).as_words()[1];
+const MODULUS_CORRECTION: U256 = U256::ZERO.wrapping_sub(&MODULUS);
 
 /// Scalars modulo SECP256k1 modulus (2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1).
 /// Uses 8 32-bit limbs (little-endian) and acceleration support from the RISC Zero rv32im impl.
@@ -71,10 +70,8 @@ impl FieldElement8x32R0 {
 
     /// Checks if the field element is greater or equal to the modulus.
     fn get_overflow(&self) -> Choice {
-        let limbs = self.0.as_limbs();
-        let (_, c0) = limbs[0].adc(Limb(MODULUS_CORRECTION_0), Limb(0));
-        let (_, c1) = limbs[1].adc(Limb(MODULUS_CORRECTION_0), c0);
-        Choice::from(c1.0 as u8)
+        let (_, carry) = self.0.adc(&MODULUS_CORRECTION, Limb(0));
+        Choice::from(carry.0 as u8)
     }
 
     /// Brings the field element's magnitude to 1, but does not necessarily normalize it.
@@ -147,8 +144,8 @@ impl FieldElement8x32R0 {
         // Wrap and unwrap to prevent the compiler interpreting this as a boolean, potentially
         // introducing non-constant time code.
         let mask = Choice::from(carry.0 as u8).unwrap_u8() + Self(a).get_overflow().unwrap_u8();
-        let c0 = MODULUS_CORRECTION_0 * (mask as u32);
-        let c1 = MODULUS_CORRECTION_1 * (mask as u32);
+        let c0 = MODULUS_CORRECTION.as_words()[0] * (mask as u32);
+        let c1 = MODULUS_CORRECTION.as_words()[1] * (mask as u32);
         let correction = U256::from_words([c0, c1, 0, 0, 0, 0, 0, 0]);
 
         Self(a.wrapping_add(&correction))
