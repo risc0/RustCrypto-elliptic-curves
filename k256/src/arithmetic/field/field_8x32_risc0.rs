@@ -146,10 +146,9 @@ impl FieldElement8x32R0 {
 
         // If a carry or overflow of the modulus occurred, we need to add 2^256 - p.
         // c0 and c1 and the two non-zero limbs of the correction value.
-        let denorm = Self(a).get_overflow().unwrap_u8() as u32;
-        let mask = carry.0 | denorm;
-        let c0 = MODULUS_CORRECTION_0 * mask;
-        let c1 = MODULUS_CORRECTION_1 * mask;
+        let mask = (Choice::from(carry.0 as u8) | Self(a).get_overflow()).unwrap_u8();
+        let c0 = MODULUS_CORRECTION_0 * (mask as u32);
+        let c1 = MODULUS_CORRECTION_1 * (mask as u32);
         let correction = U256::from_words([c0, c1, 0, 0, 0, 0, 0, 0]);
 
         Self(a.wrapping_add(&correction))
