@@ -84,8 +84,8 @@ impl FieldElement8x32R0 {
     /// NOTE: In RISC Zero, this is a no-op since weak normalization is not an operation that
     /// needs to be performed between calls to arithmetic routines.
     #[inline(always)]
-    pub fn normalize_weak(&self) -> Self {
-        self.clone()
+    pub const fn normalize_weak(&self) -> Self {
+        Self(self.0)
     }
 
     /// Returns the fully normalized and canonical representation of the value.
