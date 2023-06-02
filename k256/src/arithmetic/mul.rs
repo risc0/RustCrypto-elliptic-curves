@@ -69,7 +69,7 @@ impl From<&ProjectivePoint> for LookupTable {
         LookupTable(points)
     }
 }
-/// Lookup table containing precomputed values `[p, 2p, 3p, ..., 8p]`
+/// Lookup table containing precomputed values `[0, p, 2p, 3p, ..., 8p]`
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
 #[repr(align(1024))]
 #[derive(Copy, Clone, Default)]
