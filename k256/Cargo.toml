@@ -31,7 +31,6 @@ signature = { version = "2", optional = true }
 
 [target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
 getrandom = { version = "0.2.9", features = ["custom"] }
-bytemuck = "1.13"
 
 [dev-dependencies]
 blobby = "0.3"

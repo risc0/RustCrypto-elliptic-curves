@@ -60,10 +60,19 @@ impl FieldElementImpl {
 
     fn new(value: &FieldElementUnsafeImpl, magnitude: u32) -> Self {
         debug_assert!(magnitude <= FieldElementUnsafeImpl::max_magnitude());
-        Self {
-            value: *value,
-            magnitude,
-            normalized: false,
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
+            // In the RISC Zero field impl, magnitude is always 1.
+            Self {
+                value: *value,
+                magnitude: 1,
+                normalized: false,
+            }
+        } else {
+            Self {
+                value: *value,
+                magnitude,
+                normalized: false,
+            }
         }
     }
 
