@@ -588,7 +588,6 @@ dependencies = [
  "criterion",
  "ecdsa",
  "elliptic-curve",
- "getrandom",
  "hex",
  "hex-literal",
  "num-bigint",
