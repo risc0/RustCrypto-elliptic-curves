@@ -465,7 +465,7 @@ impl Invert for Scalar {
     /// sidechannels.
     #[allow(non_snake_case)]
     fn invert_vartime(&self) -> CtOption<Self> {
-        if cfg!(not(all(target_os = "zkvm", target_arch = "riscv32"))) {
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
             // Constant time algorithm is faster in the RISC Zero zkVM.
             return self.invert();
         }
