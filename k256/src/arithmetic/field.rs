@@ -521,7 +521,6 @@ mod tests {
     use elliptic_curve::ff::{Field, PrimeField};
     use num_bigint::{BigUint, ToBigUint};
 
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::prelude::*;
 
     use super::FieldElement;
@@ -728,7 +727,6 @@ mod tests {
         let _result = y.is_odd();
     }
 
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     prop_compose! {
         fn field_element()(bytes in any::<[u8; 32]>()) -> FieldElement {
             let mut res = bytes_to_biguint(&bytes);
@@ -742,8 +740,16 @@ mod tests {
         }
     }
 
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+    fn config() -> ProptestConfig {
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
+            ProptestConfig::with_cases(1)
+        } else {
+            ProptestConfig::default()
+        }
+    }
+
     proptest! {
+        #![proptest_config(config())]
 
         #[test]
         fn fuzzy_add(
