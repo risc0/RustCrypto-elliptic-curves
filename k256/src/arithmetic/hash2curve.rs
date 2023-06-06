@@ -284,7 +284,6 @@ mod tests {
         Curve,
     };
     use hex_literal::hex;
-
     use proptest::{num::u64::ANY, prelude::ProptestConfig, proptest};
 
     #[test]

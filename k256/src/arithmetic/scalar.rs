@@ -144,8 +144,7 @@ impl Scalar {
 
     #[inline(always)]
     fn normalize(&self) -> Self {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
             assert!(bool::from(self.0.ct_lt(&ORDER)));
         }
         self.clone()
@@ -465,8 +464,12 @@ impl Invert for Scalar {
     /// variable-time operation can potentially leak secrets through
     /// sidechannels.
     #[allow(non_snake_case)]
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn invert_vartime(&self) -> CtOption<Self> {
+        if cfg!(not(all(target_os = "zkvm", target_arch = "riscv32"))) {
+            // Constant time algorithm is faster in the RISC Zero zkVM.
+            return self.invert();
+        }
+
         let mut u = *self;
         let mut v = Self::from_uint_unchecked(Secp256k1::ORDER);
         let mut A = Self::ONE;
@@ -510,12 +513,6 @@ impl Invert for Scalar {
         }
 
         CtOption::new(C, !self.is_zero())
-    }
-
-    // Constant time algorithm, based on multiplications, is faster in the zkVM.
-    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-    fn invert_vartime(&self) -> CtOption<Self> {
-        self.invert()
     }
 }
 
@@ -842,7 +839,6 @@ mod tests {
     };
     use num_bigint::{BigUint, ToBigUint};
     use num_traits::Zero;
-
     use proptest::prelude::*;
 
     impl From<&BigUint> for Scalar {

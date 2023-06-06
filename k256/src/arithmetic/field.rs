@@ -520,7 +520,6 @@ impl<'a> Product<&'a FieldElement> for FieldElement {
 mod tests {
     use elliptic_curve::ff::{Field, PrimeField};
     use num_bigint::{BigUint, ToBigUint};
-
     use proptest::prelude::*;
 
     use super::FieldElement;
