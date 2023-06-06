@@ -137,18 +137,33 @@ impl FieldElement8x32R0 {
     /// Returns self + rhs mod p.
     /// Sums the magnitudes.
     pub fn add(&self, rhs: &Self) -> Self {
-        let (a, carry) = self.0.adc(&rhs.0, Limb(0));
+        let self_limbs = self.0.as_limbs();
+        let rhs_limbs = rhs.0.as_limbs();
 
-        // If a carry or overflow of the modulus occurred, we need to add 2^256 - p.
-        // c0 and c1 and the two non-zero limbs of the correction value.
+        // Carrying addition of self and rhs, with the overflow correction added in.
+        let (a0, carry0) = self_limbs[0].adc(rhs_limbs[0], MODULUS_CORRECTION.as_limbs()[0]);
+        let (a1, carry1) = self_limbs[1].adc(
+            rhs_limbs[1],
+            carry0.wrapping_add(MODULUS_CORRECTION.as_limbs()[1]),
+        );
+        let (a2, carry2) = self_limbs[2].adc(rhs_limbs[2], carry1);
+        let (a3, carry3) = self_limbs[3].adc(rhs_limbs[3], carry2);
+        let (a4, carry4) = self_limbs[4].adc(rhs_limbs[4], carry3);
+        let (a5, carry5) = self_limbs[5].adc(rhs_limbs[5], carry4);
+        let (a6, carry6) = self_limbs[6].adc(rhs_limbs[6], carry5);
+        let (a7, carry7) = self_limbs[7].adc(rhs_limbs[7], carry6);
+        let a = U256::from([a0, a1, a2, a3, a4, a5, a6, a7]);
+
+        // If a carry occured, then the correction was already added and the result is correct.
+        // If a carry did not occur, the correction needs to be removed. Result will be in [0, p).
         // Wrap and unwrap to prevent the compiler interpreting this as a boolean, potentially
         // introducing non-constant time code.
-        let mask = Choice::from(carry.0 as u8).unwrap_u8() + Self(a).get_overflow().unwrap_u8();
+        let mask = 1 - Choice::from(carry7.0 as u8).unwrap_u8();
         let c0 = MODULUS_CORRECTION.as_words()[0] * (mask as u32);
         let c1 = MODULUS_CORRECTION.as_words()[1] * (mask as u32);
         let correction = U256::from_words([c0, c1, 0, 0, 0, 0, 0, 0]);
 
-        Self(a.wrapping_add(&correction))
+        Self(a.wrapping_sub(&correction))
     }
 
     /// Returns self * rhs mod p
@@ -210,7 +225,8 @@ mod tests {
     extern crate alloc;
 
     fn as_hex(&elem: &F) -> alloc::string::String {
-        ::hex::encode_upper(elem.to_bytes())
+        // Call normalize here simply to assert that the value is normalized.
+        ::hex::encode_upper(elem.normalize().to_bytes())
     }
 
     #[test]
