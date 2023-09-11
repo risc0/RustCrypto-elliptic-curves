@@ -154,6 +154,11 @@ impl FieldElement8x32R0 {
         let (a7, carry7) = self_limbs[7].adc(rhs_limbs[7], carry6);
         let a = U256::from([a0, a1, a2, a3, a4, a5, a6, a7]);
 
+        // If the inputs are not in the range [0, p), then then carry7 may be greater than 1,
+        // indicating more than one overflow occurred. In this case, the code below will not
+        // correct the value. If the host is cooperative, this should never happen.
+        assert!(carry7.0 <= 1);
+
         // If a carry occured, then the correction was already added and the result is correct.
         // If a carry did not occur, the correction needs to be removed. Result will be in [0, p).
         // Wrap and unwrap to prevent the compiler interpreting this as a boolean, potentially
@@ -163,6 +168,8 @@ impl FieldElement8x32R0 {
         let c1 = MODULUS_CORRECTION.as_words()[1] * (mask as u32);
         let correction = U256::from_words([c0, c1, 0, 0, 0, 0, 0, 0]);
 
+        // The correction value was either already added to a, or is 0, so this sub will not
+        // underflow.
         Self(a.wrapping_sub(&correction))
     }
 
