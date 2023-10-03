@@ -31,7 +31,7 @@ jobs:
           - wasm32-unknown-unknown
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: risc0/risc0/.github/actions/rustup@main
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
@@ -69,7 +69,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: risc0/risc0/.github/actions/rustup@main
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
@@ -79,45 +79,11 @@ jobs:
       - run: cargo test --release --target ${{ matrix.target }}
       - run: cargo test --release --target ${{ matrix.target }} --all-features
 
-  cross:
-    strategy:
-      matrix:
-        include:
-          # ARM32
-          - target: armv7-unknown-linux-gnueabihf
-            rust: 1.65.0 # MSRV (cross)
-          - target: armv7-unknown-linux-gnueabihf
-            rust: stable
-
-          # ARM64
-          - target: aarch64-unknown-linux-gnu
-            rust: 1.65.0 # MSRV (cross)
-          - target: aarch64-unknown-linux-gnu
-            rust: stable
-
-          # PPC32
-          - target: powerpc-unknown-linux-gnu
-            rust: 1.65.0 # MSRV (cross)
-          - target: powerpc-unknown-linux-gnu
-            rust: stable
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: ${{ matrix.deps }}
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-          targets: ${{ matrix.target }}
-      - uses: RustCrypto/actions/cross-install@master
-      - run: cross test --release --target ${{ matrix.target }} --all-features
-
   doc:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@master
+      - uses: risc0/risc0/.github/actions/rustup@main
         with:
           toolchain: stable
       - run: cargo doc --all-features

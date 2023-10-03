@@ -31,7 +31,7 @@ jobs:
           - wasm32-unknown-unknown
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: risc0/risc0/.github/actions/rustup@main
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
@@ -46,7 +46,7 @@ jobs:
           - stable
     steps:
     - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@master
+    - uses: risc0/risc0/.github/actions/rustup@main
       with:
         toolchain: ${{ matrix.rust }}
     - run: cargo check --all-features
@@ -58,8 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@master
+      - uses: risc0/risc0/.github/actions/rustup@main
         with:
           toolchain: stable
       - run: cargo doc --all-features

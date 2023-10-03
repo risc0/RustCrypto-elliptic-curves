@@ -147,7 +147,7 @@ impl Scalar {
         if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
             assert!(bool::from(self.0.ct_lt(&ORDER)));
         }
-        self.clone()
+        *self
     }
 
     /// Right shifts the scalar.
