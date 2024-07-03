@@ -8,11 +8,10 @@ pub(crate) mod field;
 #[cfg(feature = "hash2curve")]
 mod hash2curve;
 pub(crate) mod scalar;
-pub(crate) mod util;
 
 use self::{field::FieldElement, scalar::Scalar};
 use crate::NistP256;
-use elliptic_curve::{CurveArithmetic, PrimeCurveArithmetic};
+use elliptic_curve::{bigint::U256, CurveArithmetic, PrimeCurveArithmetic};
 use primeorder::{point_arithmetic, PrimeCurveParams};
 
 /// Elliptic curve point in affine coordinates.
@@ -39,10 +38,13 @@ impl PrimeCurveParams for NistP256 {
     type PointArithmetic = point_arithmetic::EquationAIsMinusThree;
 
     /// a = -3
-    const EQUATION_A: FieldElement = FieldElement::from_u64(3).neg();
+    const EQUATION_A: FieldElement = FieldElement(U256::from_be_hex(
+        "FFFFFFFC00000004000000000000000000000003FFFFFFFFFFFFFFFFFFFFFFFC",
+    ));
 
-    const EQUATION_B: FieldElement =
-        FieldElement::from_hex("5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b");
+    const EQUATION_B: FieldElement = FieldElement(U256::from_be_hex(
+        "DC30061D04874834E5A220ABF7212ED6ACF005CD78843090D89CDF6229C4BDDF",
+    ));
 
     /// Base point of P-256.
     ///
@@ -53,7 +55,45 @@ impl PrimeCurveParams for NistP256 {
     /// Gᵧ = 4fe342e2 fe1a7f9b 8ee7eb4a 7c0f9e16 2bce3357 6b315ece cbb64068 37bf51f5
     /// ```
     const GENERATOR: (FieldElement, FieldElement) = (
-        FieldElement::from_hex("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"),
-        FieldElement::from_hex("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"),
+        FieldElement(U256::from_be_hex(
+            "18905F76A53755C679FB732B7762251075BA95FC5FEDB60179E730D418A9143C",
+        )),
+        FieldElement(U256::from_be_hex(
+            "8571FF1825885D85D2E88688DD21F3258B4AB8E4BA19E45CDDF25357CE95560A",
+        )),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FieldElement;
+    use crate::NistP256;
+    use primeorder::PrimeCurveParams;
+
+    #[test]
+    fn equation_a_constant() {
+        let equation_a = FieldElement::from_u64(3).neg();
+        assert_eq!(equation_a, NistP256::EQUATION_A);
+    }
+
+    #[test]
+    fn equation_b_constant() {
+        let equation_b = FieldElement::from_hex(
+            "5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b",
+        );
+        assert_eq!(equation_b, NistP256::EQUATION_B);
+    }
+
+    #[test]
+    fn generator_constant() {
+        let generator: (FieldElement, FieldElement) = (
+            FieldElement::from_hex(
+                "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296",
+            ),
+            FieldElement::from_hex(
+                "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+            ),
+        );
+        assert_eq!(generator, NistP256::GENERATOR);
+    }
 }
