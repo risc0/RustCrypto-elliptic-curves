@@ -93,15 +93,7 @@ impl Scalar {
 
     /// Returns 2*self.
     pub fn double(&self) -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
-                let result = Self(risc0::modmul_u256_denormalized(&self.0, &self.0, &NistP256::ORDER));
-                assert!(bool::from(result.0.ct_lt(&NistP256::ORDER)));
-                result
-            } else {
-                self.add(self)
-            }
-        }
+        self.add(self)
     }
 
     /// Returns self - rhs mod n.
