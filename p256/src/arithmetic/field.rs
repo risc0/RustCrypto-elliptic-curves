@@ -654,8 +654,16 @@ mod tests {
         assert_eq!(four.sqrt().unwrap(), two);
     }
 
-    #[cfg(target_pointer_width = "64")]
+    fn config() -> ProptestConfig {
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
+            ProptestConfig::with_cases(1)
+        } else {
+            ProptestConfig::default()
+        }
+    }
+
     proptest! {
+        #![proptest_config(config())]
         /// This checks behaviour well within the field ranges, because it doesn't set the
         /// highest limb.
         #[test]
