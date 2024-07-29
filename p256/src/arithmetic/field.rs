@@ -502,9 +502,7 @@ mod tests {
     use core::ops::Mul;
     use elliptic_curve::ff::PrimeField;
 
-    #[cfg(target_pointer_width = "64")]
     use crate::U256;
-    #[cfg(target_pointer_width = "64")]
     use proptest::{num::u64::ANY, prelude::*};
 
     #[test]
@@ -654,16 +652,8 @@ mod tests {
         assert_eq!(four.sqrt().unwrap(), two);
     }
 
-    fn config() -> ProptestConfig {
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            ProptestConfig::with_cases(1)
-        } else {
-            ProptestConfig::default()
-        }
-    }
-
+    #[cfg(target_pointer_width = "64")]
     proptest! {
-        #![proptest_config(config())]
         /// This checks behaviour well within the field ranges, because it doesn't set the
         /// highest limb.
         #[test]
