@@ -4,7 +4,9 @@
 #[cfg_attr(target_pointer_width = "64", path = "scalar/scalar64.rs")]
 mod scalar_impl;
 
-use self::scalar_impl::barrett_reduce;
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use elliptic_curve::bigint::risc0;
+
 use crate::{FieldBytes, NistP256, SecretKey, ORDER_HEX};
 use core::{
     fmt::{self, Debug},
@@ -37,17 +39,6 @@ pub(crate) const MODULUS: U256 = NistP256::ORDER;
 
 /// `MODULUS / 2`
 const FRAC_MODULUS_2: Scalar = Scalar(MODULUS.shr_vartime(1));
-
-/// MU = floor(2^512 / n)
-///    = 115792089264276142090721624801893421302707618245269942344307673200490803338238
-///    = 0x100000000fffffffffffffffeffffffff43190552df1a6c21012ffd85eedf9bfe
-pub const MU: [u64; 5] = [
-    0x012f_fd85_eedf_9bfe,
-    0x4319_0552_df1a_6c21,
-    0xffff_fffe_ffff_ffff,
-    0x0000_0000_ffff_ffff,
-    0x0000_0000_0000_0001,
-];
 
 /// Scalars are elements in the finite field modulo n.
 ///
@@ -101,7 +92,7 @@ impl Scalar {
     }
 
     /// Returns 2*self.
-    pub const fn double(&self) -> Self {
+    pub fn double(&self) -> Self {
         self.add(self)
     }
 
@@ -111,13 +102,21 @@ impl Scalar {
     }
 
     /// Returns self * rhs mod n
-    pub const fn multiply(&self, rhs: &Self) -> Self {
-        let (lo, hi) = self.0.mul_wide(&rhs.0);
-        Self(barrett_reduce(lo, hi))
+    pub fn multiply(&self, rhs: &Self) -> Self {
+        cfg_if::cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
+                let result = Self(risc0::modmul_u256_denormalized(&self.0, &rhs.0, &NistP256::ORDER));
+                assert!(bool::from(result.0.ct_lt(&NistP256::ORDER)));
+                result
+            } else {
+                let (lo, hi) = self.0.mul_wide(&rhs.0);
+                Self(scalar_impl::barrett_reduce(lo, hi))
+            }
+        }
     }
 
     /// Returns self * self mod p
-    pub const fn square(&self) -> Self {
+    pub fn square(&self) -> Self {
         // Schoolbook multiplication.
         self.multiply(self)
     }
@@ -137,7 +136,7 @@ impl Scalar {
     /// Returns the multiplicative inverse of self.
     ///
     /// Does not check that self is non-zero.
-    const fn invert_unchecked(&self) -> Self {
+    fn invert_unchecked(&self) -> Self {
         // We need to find b such that b * a ≡ 1 mod p. As we are in a prime
         // field, we can apply Fermat's Little Theorem:
         //
@@ -158,7 +157,7 @@ impl Scalar {
 
     /// Exponentiates `self` by `exp`, where `exp` is a little-endian order integer
     /// exponent.
-    pub const fn pow_vartime(&self, exp: &[u64]) -> Self {
+    pub fn pow_vartime(&self, exp: &[u64]) -> Self {
         let mut res = Self::ONE;
 
         let mut i = exp.len();
@@ -287,13 +286,17 @@ impl PrimeField for Scalar {
     const MODULUS: &'static str = ORDER_HEX;
     const NUM_BITS: u32 = 256;
     const CAPACITY: u32 = 255;
-    const TWO_INV: Self = Self(U256::from_u8(2)).invert_unchecked();
+    const TWO_INV: Self = Self(U256::from_be_hex(
+        "7FFFFFFF800000007FFFFFFFFFFFFFFFDE737D56D38BCF4279DCE5617E3192A9",
+    ));
     const MULTIPLICATIVE_GENERATOR: Self = Self(U256::from_u8(7));
     const S: u32 = 4;
     const ROOT_OF_UNITY: Self = Self(U256::from_be_hex(
         "ffc97f062a770992ba807ace842a3dfc1546cad004378daf0592d7fbb41e6602",
     ));
-    const ROOT_OF_UNITY_INV: Self = Self::ROOT_OF_UNITY.invert_unchecked();
+    const ROOT_OF_UNITY_INV: Self = Self(U256::from_be_hex(
+        "A0A66A5562D46F2AC645FA0458131CAEE3AC117C794C4137379C7F0657C73764",
+    ));
     const DELTA: Self = Self(U256::from_u64(33232930569601));
 
     /// Attempts to parse the given byte array as an SEC1-encoded scalar.
@@ -363,6 +366,11 @@ impl Invert for Scalar {
     /// sidechannels.
     #[allow(non_snake_case)]
     fn invert_vartime(&self) -> CtOption<Self> {
+        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
+            // Constant time algorithm is faster in the RISC Zero zkVM.
+            return self.invert();
+        }
+
         let mut u = *self;
         let mut v = Self(MODULUS);
         let mut A = Self::ONE;
@@ -687,7 +695,7 @@ impl ReduceNonZero<U256> for Scalar {
 
 impl Sum for Scalar {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(core::ops::Add::add).unwrap_or(Self::ZERO)
+        iter.reduce(Add::add).unwrap_or(Self::ZERO)
     }
 }
 
@@ -699,7 +707,7 @@ impl<'a> Sum<&'a Scalar> for Scalar {
 
 impl Product for Scalar {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(core::ops::Mul::mul).unwrap_or(Self::ONE)
+        iter.reduce(Mul::mul).unwrap_or(Self::ONE)
     }
 }
 
@@ -751,7 +759,10 @@ impl<'de> Deserialize<'de> for Scalar {
 mod tests {
     use super::Scalar;
     use crate::{FieldBytes, SecretKey};
-    use elliptic_curve::group::ff::{Field, PrimeField};
+    use elliptic_curve::{
+        bigint::U256,
+        group::ff::{Field, PrimeField},
+    };
     use primeorder::{
         impl_field_identity_tests, impl_field_invert_tests, impl_field_sqrt_tests,
         impl_primefield_tests,
@@ -778,6 +789,23 @@ mod tests {
 
         let scalar = Scalar::from_repr(bytes).unwrap();
         assert_eq!(bytes, scalar.to_bytes());
+    }
+
+    #[test]
+    fn root_of_unity_test() {
+        let root_of_unity_inv = Scalar::ROOT_OF_UNITY.invert_unchecked();
+        assert_eq!(root_of_unity_inv, Scalar::ROOT_OF_UNITY_INV);
+        assert_eq!(
+            (Scalar::ROOT_OF_UNITY * Scalar::ROOT_OF_UNITY_INV),
+            Scalar::ONE
+        )
+    }
+
+    #[test]
+    fn two_inv_test() {
+        let number = Scalar(U256::from_u8(2)).invert_unchecked();
+        assert_eq!(number, Scalar::TWO_INV);
+        assert_eq!((Scalar::from(2u64) * Scalar::TWO_INV), Scalar::ONE);
     }
 
     /// Basic tests that multiplication works.
