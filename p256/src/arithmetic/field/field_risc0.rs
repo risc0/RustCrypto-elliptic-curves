@@ -1,13 +1,33 @@
 //! 64-bit secp256r1 field element algorithms.
 
 use super::{MODULUS, MODULUS_HEX};
-use elliptic_curve::bigint::{risc0, Limb, U256};
+use elliptic_curve::{
+    bigint::{risc0, Limb, U256},
+    subtle::Choice,
+};
 
 const MODULUS_256: U256 = U256::from_be_hex(MODULUS_HEX);
+const MODULUS_CORRECTION: U256 = U256::ZERO.wrapping_sub(&MODULUS_256);
 
-pub(super) const fn add(a: U256, b: U256) -> U256 {
-    let a = a.as_limbs();
-    let b = b.as_limbs();
+/// Checks if the field element is greater or equal to the modulus.
+fn get_overflow(a: U256) -> Choice {
+    let (_, carry) = a.adc(&MODULUS_CORRECTION, Limb(0));
+    Choice::from(carry.0 as u8)
+}
+
+/// Returns the fully normalized and canonical representation of the value.
+#[inline(always)]
+pub fn normalize(a: U256) -> U256 {
+    // When the prover is cooperative, the value is always normalized.
+    assert!(!bool::from(get_overflow(a)));
+    a.clone()
+}
+
+pub(super) fn add(a: U256, b: U256) -> U256 {
+    let a_normalized = normalize(a);
+    let b_normalized = normalize(b);
+    let a = a_normalized.as_limbs();
+    let b = b_normalized.as_limbs();
 
     // Bit 256 of p is set, so addition can result in nine words.
     // let (w0, carry) = adc(a[0], b[0], 0);

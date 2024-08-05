@@ -44,7 +44,7 @@ pub(super) const fn add(a: U256, b: U256) -> U256 {
 pub(super) fn mul_single(a: U256, rhs: u32) -> U256 {
     let mut result = U256::ZERO;
     for _i in 0..rhs {
-        result = add(a, a)
+        result = add(result, a)
     }
     result
 }

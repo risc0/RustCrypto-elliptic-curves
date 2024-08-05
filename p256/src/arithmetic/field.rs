@@ -103,7 +103,7 @@ impl FieldElement {
     }
 
     /// Returns self + rhs mod p
-    pub const fn add(&self, rhs: &Self) -> Self {
+    pub fn add(&self, rhs: &Self) -> Self {
         Self(field_impl::add(self.0, rhs.0))
     }
 
