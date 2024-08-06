@@ -42,11 +42,36 @@ pub(super) const fn add(a: U256, b: U256) -> U256 {
 /// Multiplies by a single-limb integer.
 /// Multiplies the magnitude by the same value.
 pub(super) fn mul_single(a: U256, rhs: u32) -> U256 {
-    let mut result = U256::ZERO;
-    for _i in 0..rhs {
-        result = add(result, a)
-    }
-    result
+    let a_limbs = a.as_limbs();
+    let rhs_limb = Limb::from_u32(rhs);
+    let (w0, carry) = a[0].mac(b[0], Limb::ZERO);
+    let (w1, carry) = a[1].mac(b[1], carry);
+    let (w2, carry) = a[2].mac(b[2], carry);
+    let (w3, carry) = a[3].mac(b[3], carry);
+    let (w4, carry) = a[4].mac(b[4], carry);
+    let (w5, carry) = a[5].mac(b[5], carry);
+    let (w6, carry) = a[6].mac(b[6], carry);
+    let (w7, w8) = a[7].mac(b[7], carry);
+    // Attempt to subtract the modulus, to ensure the result is in the field.
+    let modulus = MODULUS.0.as_limbs();
+
+    let (result, _) = sub_inner(
+        [w0, w1, w2, w3, w4, w5, w6, w7, w8],
+        [
+            modulus[0],
+            modulus[1],
+            modulus[2],
+            modulus[3],
+            modulus[4],
+            modulus[5],
+            modulus[6],
+            modulus[7],
+            Limb::ZERO,
+        ],
+    );
+    U256::new([
+        result[0], result[1], result[2], result[3], result[4], result[5], result[6], result[7],
+    ])
 }
 
 /// Returns self * rhs mod p

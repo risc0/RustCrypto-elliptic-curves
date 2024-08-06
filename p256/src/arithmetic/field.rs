@@ -123,12 +123,12 @@ impl FieldElement {
     }
 
     /// Returns self - rhs mod p
-    pub const fn sub(&self, rhs: &Self) -> Self {
+    pub fn sub(&self, rhs: &Self) -> Self {
         Self(field_impl::sub(self.0, rhs.0))
     }
 
     /// Negate element.
-    pub const fn neg(&self) -> Self {
+    pub fn neg(&self) -> Self {
         Self::sub(&Self::ZERO, self)
     }
 
