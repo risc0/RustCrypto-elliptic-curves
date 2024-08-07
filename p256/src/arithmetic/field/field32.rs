@@ -52,26 +52,14 @@ pub(super) fn mul_single(a: U256, rhs: u32) -> U256 {
     let (w5, carry) = a[5].mac(b[5], carry);
     let (w6, carry) = a[6].mac(b[6], carry);
     let (w7, w8) = a[7].mac(b[7], carry);
-    // Attempt to subtract the modulus, to ensure the result is in the field.
-    let modulus = MODULUS.0.as_limbs();
 
-    let (result, _) = sub_inner(
-        [w0, w1, w2, w3, w4, w5, w6, w7, w8],
-        [
-            modulus[0],
-            modulus[1],
-            modulus[2],
-            modulus[3],
-            modulus[4],
-            modulus[5],
-            modulus[6],
-            modulus[7],
-            Limb::ZERO,
-        ],
-    );
-    U256::new([
-        result[0], result[1], result[2], result[3], result[4], result[5], result[6], result[7],
-    ])
+    // Reduce the carry mod prime
+    let carry = U256::from(w8);
+    let (reduced_carry, _) = carry.const_rem(&MODULUS.0);
+
+    // Modular addition of non-carry and reduced carry
+    let non_carries = U256::new([w0, w1, w2, w3, w4, w5, w6, w7]);
+    add(non_carries, reduced_carry)
 }
 
 /// Returns self * rhs mod p
