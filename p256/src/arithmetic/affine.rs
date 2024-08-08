@@ -35,6 +35,7 @@ pub struct AffinePoint {
     pub(crate) infinity: u8,
 }
 
+// NOTE: Removes the PrimeCurveParams generic. TODO impl PrimeCurveParams
 impl AffinePoint {
     /// Additive identity of the group a.k.a. the point at infinity.
     pub const IDENTITY: Self = Self {

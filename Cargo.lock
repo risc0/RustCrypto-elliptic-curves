@@ -767,9 +767,11 @@ name = "p256"
 version = "0.13.2"
 dependencies = [
  "blobby",
+ "cfg-if",
  "criterion",
  "ecdsa",
  "elliptic-curve",
+ "hex",
  "hex-literal",
  "primeorder",
  "proptest",

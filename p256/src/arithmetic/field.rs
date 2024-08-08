@@ -7,13 +7,9 @@
     path = "field/field_risc0.rs"
 )]
 #[cfg_attr(
-    all(
-        not(all(target_os = "zkvm", target_arch = "riscv32")),
-        target_pointer_width = "32"
-    ),
-    path = "field/field32.rs"
+    not(all(target_os = "zkvm", target_arch = "riscv32")),
+    path = "field/field64.rs"
 )]
-#[cfg_attr(target_pointer_width = "64", path = "field/field64.rs")]
 mod field_impl;
 
 use crate::FieldBytes;
@@ -36,6 +32,8 @@ const MODULUS_HEX: &str = "ffffffff00000001000000000000000000000000fffffffffffff
 /// p = 2^{224}(2^{32} − 1) + 2^{192} + 2^{96} − 1
 pub const MODULUS: FieldElement = FieldElement(U256::from_be_hex(MODULUS_HEX));
 
+// TODO Consider refactor to have field impl have an extra impl FieldElement block instead
+// of individual functions.
 /// An element in the finite field modulo p = 2^{224}(2^{32} − 1) + 2^{192} + 2^{96} − 1.
 ///
 /// The internal representation is in little-endian order.
@@ -44,10 +42,10 @@ pub struct FieldElement(pub(crate) U256);
 
 impl FieldElement {
     /// Zero element.
-    pub const ZERO: Self = Self(U256::ZERO);
+    pub const ZERO: Self = FieldElement(U256::ZERO);
 
     /// Multiplicative identity.
-    pub const ONE: Self = Self(U256::ONE);
+    pub const ONE: Self = field_impl::ONE;
 
     /// Attempts to parse the given byte array as an SEC1-encoded field element.
     ///
@@ -59,18 +57,18 @@ impl FieldElement {
 
     /// Returns the SEC1 encoding of this field element.
     pub fn to_bytes(self) -> FieldBytes {
-        self.0.to_be_byte_array()
+        field_impl::to_bytes(self)
     }
 
     /// Decode [`FieldElement`] from [`U256`]
     pub fn from_uint(uint: U256) -> CtOption<Self> {
         let is_some = uint.ct_lt(&MODULUS.0);
-        CtOption::new(Self(uint), is_some)
+        CtOption::new(Self::from_uint_unchecked(uint), is_some)
     }
 
     /// Convert a `u64` into a [`FieldElement`].
-    pub fn from_u64(w: u64) -> Self {
-        Self(U256::from_u64(w))
+    pub const fn from_u64(w: u64) -> Self {
+        Self::from_uint_unchecked(U256::from_u64(w))
     }
 
     /// Parse a [`FieldElement`] from big endian hex-encoded bytes.
@@ -78,9 +76,17 @@ impl FieldElement {
     /// Does *not* perform a check that the field element does not overflow the order.
     ///
     /// This method is primarily intended for defining internal constants.
-    #[allow(dead_code)]
-    pub(crate) fn from_hex(hex: &str) -> Self {
-        Self(U256::from_be_hex(hex))
+    pub(crate) const fn from_hex(hex: &str) -> Self {
+        Self::from_uint_unchecked(U256::from_be_hex(hex))
+    }
+
+    /// Decode [`FieldElement`] from [`U256`] converting it as needed.
+    ///
+    /// Does *not* perform a check that the field element does not overflow the order.
+    ///
+    /// Used incorrectly this can lead to invalid results!
+    pub(crate) const fn from_uint_unchecked(w: U256) -> Self {
+        field_impl::from_uint_unchecked(w)
     }
 
     /// Determine if this `FieldElement` is zero.
@@ -89,7 +95,7 @@ impl FieldElement {
     ///
     /// If zero, return `Choice(1)`.  Otherwise, return `Choice(0)`.
     pub fn is_zero(&self) -> Choice {
-        self.ct_eq(&FieldElement::ZERO)
+        field_impl::is_zero(&self)
     }
 
     /// Determine if this `FieldElement` is odd in the SEC1 sense: `self mod 2 == 1`.
@@ -103,28 +109,25 @@ impl FieldElement {
     }
 
     /// Returns self + rhs mod p
-    pub fn add(&self, rhs: &Self) -> Self {
-        Self(field_impl::add(self.0, rhs.0))
+    pub const fn add(&self, rhs: &Self) -> Self {
+        field_impl::add(&self, &rhs)
     }
 
     /// Multiplies by a single-limb integer.
+    ///
     /// Multiplies the magnitude by the same value.
     pub fn mul_single(&self, rhs: u32) -> Self {
-        Self(field_impl::mul_single(self.0, rhs))
+        field_impl::mul_single(&self, rhs)
     }
 
     /// Returns 2*self.
     pub fn double(&self) -> Self {
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            self.mul_single(2)
-        } else {
-            self.add(self)
-        }
+        field_impl::double(&self)
     }
 
     /// Returns self - rhs mod p
     pub fn sub(&self, rhs: &Self) -> Self {
-        Self(field_impl::sub(self.0, rhs.0))
+        field_impl::sub(&self, &rhs)
     }
 
     /// Negate element.
@@ -134,7 +137,7 @@ impl FieldElement {
 
     /// Returns self * rhs mod p
     pub fn multiply(&self, rhs: &Self) -> Self {
-        Self(field_impl::mul(self.0, rhs.0))
+        field_impl::mul(self.0, rhs.0)
     }
 
     /// Returns self * self mod p
@@ -180,7 +183,7 @@ impl FieldElement {
     /// Returns the multiplicative inverse of self.
     ///
     /// Does not check that self is non-zero.
-    pub fn invert_unchecked(&self) -> Self {
+    fn invert_unchecked(&self) -> Self {
         // We need to find b such that b * a ≡ 1 mod p. As we are in a prime
         // field, we can apply Fermat's Little Theorem:
         //
@@ -235,14 +238,7 @@ impl Field for FieldElement {
     const ONE: Self = Self::ONE;
 
     fn random(mut rng: impl RngCore) -> Self {
-        let mut bytes = FieldBytes::default();
-
-        loop {
-            rng.fill_bytes(&mut bytes);
-            if let Some(fe) = Self::from_bytes(bytes).into() {
-                return fe;
-            }
-        }
+        field_impl::random(&mut rng)
     }
 
     #[must_use]
@@ -274,6 +270,7 @@ impl PrimeField for FieldElement {
     const MODULUS: &'static str = MODULUS_HEX;
     const NUM_BITS: u32 = 256;
     const CAPACITY: u32 = 255;
+    // TODO: These representations are not correct for montgomery form.
     const TWO_INV: Self = Self(U256::from_be_hex(
         "7FFFFFFF80000000800000000000000000000000800000000000000000000000",
     ));
@@ -329,7 +326,7 @@ impl Eq for FieldElement {}
 
 impl From<u64> for FieldElement {
     fn from(n: u64) -> FieldElement {
-        Self(U256::from(n))
+        Self::from_uint_unchecked(U256::from(n))
     }
 }
 
@@ -473,7 +470,7 @@ impl Neg for &FieldElement {
 
 impl Sum for FieldElement {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(Add::add).unwrap_or(Self::ZERO)
+        iter.reduce(core::ops::Add::add).unwrap_or(Self::ZERO)
     }
 }
 
@@ -485,7 +482,7 @@ impl<'a> Sum<&'a FieldElement> for FieldElement {
 
 impl Product for FieldElement {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(Mul::mul).unwrap_or(Self::ONE)
+        iter.reduce(core::ops::Mul::mul).unwrap_or(Self::ONE)
     }
 }
 
@@ -497,12 +494,10 @@ impl<'a> Product<&'a FieldElement> for FieldElement {
 
 #[cfg(test)]
 mod tests {
-    use super::FieldElement;
+    use super::{u64x4_to_u256, FieldElement};
     use crate::{test_vectors::field::DBL_TEST_VECTORS, FieldBytes};
     use core::ops::Mul;
     use elliptic_curve::ff::PrimeField;
-
-    use crate::U256;
     use proptest::{num::u64::ANY, prelude::*};
 
     #[test]
@@ -634,7 +629,7 @@ mod tests {
 
     #[test]
     fn invert() {
-        // assert!(bool::from(FieldElement::ZERO.invert().is_none()));
+        assert!(bool::from(FieldElement::ZERO.invert().is_none()));
 
         let one = FieldElement::ONE;
         assert_eq!(one.invert().unwrap(), one);
@@ -652,7 +647,6 @@ mod tests {
         assert_eq!(four.sqrt().unwrap(), two);
     }
 
-    #[cfg(target_pointer_width = "64")]
     proptest! {
         /// This checks behaviour well within the field ranges, because it doesn't set the
         /// highest limb.
@@ -665,8 +659,8 @@ mod tests {
             b1 in ANY,
             b2 in ANY,
         ) {
-            let a = FieldElement(U256::from_words([a0, a1, a2, 0]));
-            let b = FieldElement(U256::from_words([b0, b1, b2, 0]));
+            let a = FieldElement(u64x4_to_u256([a0, a1, a2, 0]));
+            let b = FieldElement(u64x4_to_u256([b0, b1, b2, 0]));
             assert_eq!(a.add(&b).sub(&a), b);
         }
     }
