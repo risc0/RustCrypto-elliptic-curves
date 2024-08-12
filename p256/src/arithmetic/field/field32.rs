@@ -44,22 +44,41 @@ pub(super) const fn add(a: U256, b: U256) -> U256 {
 pub(super) fn mul_single(a: U256, rhs: u32) -> U256 {
     let a_limbs = a.as_limbs();
     let rhs_limb = Limb::from_u32(rhs);
-    let (w0, carry) = a[0].mac(b[0], Limb::ZERO);
-    let (w1, carry) = a[1].mac(b[1], carry);
-    let (w2, carry) = a[2].mac(b[2], carry);
-    let (w3, carry) = a[3].mac(b[3], carry);
-    let (w4, carry) = a[4].mac(b[4], carry);
-    let (w5, carry) = a[5].mac(b[5], carry);
-    let (w6, carry) = a[6].mac(b[6], carry);
-    let (w7, w8) = a[7].mac(b[7], carry);
+    let (w0, carry) = Limb::ZERO.mac(a_limbs[0], rhs_limb, Limb::ZERO);
+    let (w1, carry) = Limb::ZERO.mac(a_limbs[1], rhs_limb, carry);
+    let (w2, carry) = Limb::ZERO.mac(a_limbs[2], rhs_limb, carry);
+    let (w3, cary) = Limb::ZERO.mac(a_limbs[3], rhs_limb, carry);
+    let (w4, carry) = Limb::ZERO.mac(a_limbs[4], rhs_limb, carry);
+    let (w5, carry) = Limb::ZERO.mac(a_limbs[5], rhs_limb, carry);
+    let (w6, carry) = Limb::ZERO.mac(a_limbs[6], rhs_limb, carry);
+    let (w7, w8) = Limb::ZERO.mac(a_limbs[7], rhs_limb, carry);
 
-    // Reduce the carry mod prime
-    let carry = U256::from(w8);
-    let (reduced_carry, _) = carry.const_rem(&MODULUS.0);
+    // Define 2^256 - MODULUS
+    let subtracted_result_str: &str =
+        "00000000FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF000000000000000000000001";
+
+    let subtracted_result = U256::from_be_hex(subtracted_result_str);
+    // Calculate w8 << 2^256 = w8 * (w^256 - MODULUS)
+    let reduced_carry = mul_inner(subtracted_result, w8);
 
     // Modular addition of non-carry and reduced carry
     let non_carries = U256::new([w0, w1, w2, w3, w4, w5, w6, w7]);
     add(non_carries, reduced_carry)
+}
+
+fn mul_inner(a: U256, b: Limb) -> U256 {
+    let a_limbs = a.as_limbs();
+    let (w0, carry) = Limb::ZERO.mac(a_limbs[0], b, Limb::ZERO);
+    let (w1, carry) = Limb::ZERO.mac(a_limbs[1], b, carry);
+    let (w2, carry) = Limb::ZERO.mac(a_limbs[2], b, carry);
+    let (w3, cary) = Limb::ZERO.mac(a_limbs[3], b, carry);
+    let (w4, carry) = Limb::ZERO.mac(a_limbs[4], b, carry);
+    let (w5, carry) = Limb::ZERO.mac(a_limbs[5], b, carry);
+    let (w6, carry) = Limb::ZERO.mac(a_limbs[6], b, carry);
+    // We can ignore the last carry
+    let (w7, _) = Limb::ZERO.mac(a_limbs[7], b, carry);
+
+    U256::new([w0, w1, w2, w3, w4, w5, w6, w7])
 }
 
 /// Returns self * rhs mod p

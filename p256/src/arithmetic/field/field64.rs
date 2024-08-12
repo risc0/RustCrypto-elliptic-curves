@@ -23,22 +23,43 @@ pub(super) const fn add(a: U256, b: U256) -> U256 {
     U256::new([result[0], result[1], result[2], result[3]])
 }
 
-/// Multiplies by a single-limb integer.P
+/// Multiplies by a single-limb integer.
 /// Multiplies the magnitude by the same value.
 pub(super) fn mul_single(a: U256, rhs: u32) -> U256 {
     let a_limbs = a.as_limbs();
     let rhs_limb = Limb::from_u32(rhs);
     let (w0, carry) = Limb::ZERO.mac(a_limbs[0], rhs_limb, Limb::ZERO);
-    let (w1, carry) = Limb::ZERO.mac(a_limbs[0], rhs_limb, carry);
-    let (w2, carry) = Limb::ZERO.mac(a_limbs[0], rhs_limb, carry);
-    let (w3, w4) = Limb::ZERO.mac(a_limbs[0], rhs_limb, carry);
+    let (w1, carry) = Limb::ZERO.mac(a_limbs[1], rhs_limb, carry);
+    let (w2, carry) = Limb::ZERO.mac(a_limbs[2], rhs_limb, carry);
+    let (w3, w4) = Limb::ZERO.mac(a_limbs[3], rhs_limb, carry);
 
-    // Reduce the carry mod prime
-    let carry = U256::from(w4);
-    let (reduced_carry, _) = carry.const_rem(&MODULUS.0);
+    // Define 2^256 - MODULUS (224 bits)
+    let subtracted_result_str: &str =
+        "00000000FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF000000000000000000000001";
+
+    let subtracted_result = U256::from_be_hex(subtracted_result_str);
+    // w4 << 2^256 is equals to w4 * (2^256 - MODULUS)
+    let reduced_carry = mul_inner(subtracted_result, w4);
 
     // Modular addition of non-carry and reduced carry
     let non_carries = U256::new([w0, w1, w2, w3]);
+    add(non_carries, reduced_carry)
+}
+
+fn mul_inner(a: U256, b: Limb) -> U256 {
+    let a_limbs = a.as_limbs();
+    let (w0, carry) = Limb::ZERO.mac(a_limbs[0], b, Limb::ZERO);
+    let (w1, carry) = Limb::ZERO.mac(a_limbs[1], b, carry);
+    let (w2, carry) = Limb::ZERO.mac(a_limbs[2], b, carry);
+    let (w3, w4) = Limb::ZERO.mac(a_limbs[3], b, carry);
+    let non_carries = U256::new([w0, w1, w2, w3]);
+
+    let (c0, carry) = Limb::ZERO.mac(a_limbs[0], w4, Limb::ZERO);
+    let (c1, carry) = Limb::ZERO.mac(a_limbs[1], w4, carry);
+    let (c2, carry) = Limb::ZERO.mac(a_limbs[2], w4, carry);
+    let (c3, _) = Limb::ZERO.mac(a_limbs[3], w4, carry);
+    let reduced_carry = U256::new([c0, c1, c2, c3]);
+
     add(non_carries, reduced_carry)
 }
 
