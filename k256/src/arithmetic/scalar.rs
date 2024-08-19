@@ -1,5 +1,7 @@
 //! Scalar field arithmetic.
 
+#![allow(unused_qualifications)]
+
 #[cfg_attr(not(target_pointer_width = "64"), path = "scalar/wide32.rs")]
 #[cfg_attr(target_pointer_width = "64", path = "scalar/wide64.rs")]
 mod wide;

@@ -1,6 +1,6 @@
 //! Field arithmetic modulo p = 2^{224}(2^{32} − 1) + 2^{192} + 2^{96} − 1
 
-#![allow(clippy::assign_op_pattern, clippy::op_ref)]
+#![allow(clippy::assign_op_pattern, clippy::op_ref, unused_qualifications)]
 
 #[cfg_attr(
     all(target_os = "zkvm", target_arch = "riscv32"),
@@ -67,7 +67,7 @@ impl FieldElement {
     }
 
     /// Convert a `u64` into a [`FieldElement`].
-    pub const fn from_u64(w: u64) -> Self {
+    pub fn from_u64(w: u64) -> Self {
         Self::from_uint_unchecked(U256::from_u64(w))
     }
 
@@ -76,7 +76,7 @@ impl FieldElement {
     /// Does *not* perform a check that the field element does not overflow the order.
     ///
     /// This method is primarily intended for defining internal constants.
-    pub(crate) const fn from_hex(hex: &str) -> Self {
+    pub(crate) fn from_hex(hex: &str) -> Self {
         Self::from_uint_unchecked(U256::from_be_hex(hex))
     }
 
@@ -85,7 +85,7 @@ impl FieldElement {
     /// Does *not* perform a check that the field element does not overflow the order.
     ///
     /// Used incorrectly this can lead to invalid results!
-    pub(crate) const fn from_uint_unchecked(w: U256) -> Self {
+    pub(crate) fn from_uint_unchecked(w: U256) -> Self {
         field_impl::from_uint_unchecked(w)
     }
 
@@ -95,7 +95,7 @@ impl FieldElement {
     ///
     /// If zero, return `Choice(1)`.  Otherwise, return `Choice(0)`.
     pub fn is_zero(&self) -> Choice {
-        field_impl::is_zero(&self)
+        field_impl::is_zero(self)
     }
 
     /// Determine if this `FieldElement` is odd in the SEC1 sense: `self mod 2 == 1`.
@@ -110,24 +110,24 @@ impl FieldElement {
 
     /// Returns self + rhs mod p
     pub const fn add(&self, rhs: &Self) -> Self {
-        field_impl::add(&self, &rhs)
+        field_impl::add(self, rhs)
     }
 
     /// Multiplies by a single-limb integer.
     ///
     /// Multiplies the magnitude by the same value.
     pub fn mul_single(&self, rhs: u32) -> Self {
-        field_impl::mul_single(&self, rhs)
+        field_impl::mul_single(self, rhs)
     }
 
     /// Returns 2*self.
     pub fn double(&self) -> Self {
-        field_impl::double(&self)
+        field_impl::double(self)
     }
 
     /// Returns self - rhs mod p
     pub fn sub(&self, rhs: &Self) -> Self {
-        field_impl::sub(&self, &rhs)
+        field_impl::sub(self, rhs)
     }
 
     /// Negate element.
@@ -137,7 +137,7 @@ impl FieldElement {
 
     /// Returns self * rhs mod p
     pub fn multiply(&self, rhs: &Self) -> Self {
-        field_impl::mul(self.0, rhs.0)
+        field_impl::multiply(self, rhs)
     }
 
     /// Returns self * self mod p

@@ -10,6 +10,7 @@ pub(crate) mod field;
 mod hash2curve;
 pub(crate) mod projective;
 pub(crate) mod scalar;
+pub(crate) mod util;
 
 use self::{field::FieldElement, scalar::Scalar};
 use crate::NistP256;

@@ -1,7 +1,12 @@
 //! 64-bit secp256r1 field element algorithms.
 
-use super::{FieldElement, MODULUS, MODULUS_HEX};
-use elliptic_curve::bigint::{Limb, U256};
+use super::{FieldBytes, FieldElement, MODULUS};
+use crate::arithmetic::util::{adc, mac, sbb, u256_to_u64x4, u64x4_to_u256};
+use elliptic_curve::{
+    bigint::{ArrayEncoding, U256},
+    rand_core::RngCore,
+    subtle::{Choice, ConstantTimeEq},
+};
 
 /// R = 2^256 mod p
 const R: FieldElement = FieldElement(U256::from_be_hex(
@@ -16,70 +21,28 @@ const R2: FieldElement = FieldElement(U256::from_be_hex(
 /// Multiplicative identity.
 pub(super) const ONE: FieldElement = R;
 
-pub(super) const fn add(a: U256, b: U256) -> U256 {
-    let a = a.as_limbs();
-    let b = b.as_limbs();
+pub(super) const fn add(lhs: &FieldElement, rhs: &FieldElement) -> FieldElement {
+    let a = u256_to_u64x4(lhs.0);
+    let b = u256_to_u64x4(rhs.0);
 
     // Bit 256 of p is set, so addition can result in five words.
-    let (w0, carry) = a[0].adc(b[0], Limb::ZERO);
-    let (w1, carry) = a[1].adc(b[1], carry);
-    let (w2, carry) = a[2].adc(b[2], carry);
-    let (w3, w4) = a[3].adc(b[3], carry);
+    let (w0, carry) = adc(a[0], b[0], 0);
+    let (w1, carry) = adc(a[1], b[1], carry);
+    let (w2, carry) = adc(a[2], b[2], carry);
+    let (w3, w4) = adc(a[3], b[3], carry);
 
-    // Attempt to subtract the modulus, to ensure the result is in the field
-    let modulus = MODULUS.0.as_limbs();
-
+    // Attempt to subtract the modulus, to ensure the result is in the field.
+    let modulus = u256_to_u64x4(MODULUS.0);
     let (result, _) = sub_inner(
-        [w0, w1, w2, w3, w4],
-        [modulus[0], modulus[1], modulus[2], modulus[3], Limb::ZERO],
+        w0, w1, w2, w3, w4, modulus[0], modulus[1], modulus[2], modulus[3], 0,
     );
-    U256::new([result[0], result[1], result[2], result[3]])
-}
-
-/// Multiplies by a single-limb integer.
-/// Multiplies the magnitude by the same value.
-pub(super) fn mul_single(a: U256, rhs: u32) -> U256 {
-    let a_limbs = a.as_limbs();
-    let rhs_limb = Limb::from_u32(rhs);
-    let (w0, carry) = Limb::ZERO.mac(a_limbs[0], rhs_limb, Limb::ZERO);
-    let (w1, carry) = Limb::ZERO.mac(a_limbs[1], rhs_limb, carry);
-    let (w2, carry) = Limb::ZERO.mac(a_limbs[2], rhs_limb, carry);
-    let (w3, w4) = Limb::ZERO.mac(a_limbs[3], rhs_limb, carry);
-
-    // Define 2^256 - MODULUS (224 bits)
-    let subtracted_result_str: &str =
-        "00000000FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF000000000000000000000001";
-
-    let subtracted_result = U256::from_be_hex(subtracted_result_str);
-    // w4 << 2^256 is equals to w4 * (2^256 - MODULUS)
-    let reduced_carry = mul_inner(subtracted_result, w4);
-
-    // Modular addition of non-carry and reduced carry
-    let non_carries = U256::new([w0, w1, w2, w3]);
-    add(non_carries, reduced_carry)
-}
-
-fn mul_inner(a: U256, b: Limb) -> U256 {
-    let a_limbs = a.as_limbs();
-    let (w0, carry) = Limb::ZERO.mac(a_limbs[0], b, Limb::ZERO);
-    let (w1, carry) = Limb::ZERO.mac(a_limbs[1], b, carry);
-    let (w2, carry) = Limb::ZERO.mac(a_limbs[2], b, carry);
-    let (w3, w4) = Limb::ZERO.mac(a_limbs[3], b, carry);
-    let non_carries = U256::new([w0, w1, w2, w3]);
-
-    let (c0, carry) = Limb::ZERO.mac(a_limbs[0], w4, Limb::ZERO);
-    let (c1, carry) = Limb::ZERO.mac(a_limbs[1], w4, carry);
-    let (c2, carry) = Limb::ZERO.mac(a_limbs[2], w4, carry);
-    let (c3, _) = Limb::ZERO.mac(a_limbs[3], w4, carry);
-    let reduced_carry = U256::new([c0, c1, c2, c3]);
-
-    add(non_carries, reduced_carry)
+    result
 }
 
 /// Returns self * rhs mod p
-pub(super) fn mul(a: &FieldElement, b: &FieldElement) -> FieldElement {
+pub(super) const fn multiply(lhs: &FieldElement, rhs: &FieldElement) -> FieldElement {
     // Schoolbook multiplication.
-    let a = u256_to_u64x4(self.0);
+    let a = u256_to_u64x4(lhs.0);
     let b = u256_to_u64x4(rhs.0);
 
     let (w0, carry) = mac(0, a[0], b[0], 0);
@@ -102,31 +65,28 @@ pub(super) fn mul(a: &FieldElement, b: &FieldElement) -> FieldElement {
     let (w5, carry) = mac(w5, a[3], b[2], carry);
     let (w6, w7) = mac(w6, a[3], b[3], carry);
 
-    FieldElement::montgomery_reduce(w0, w1, w2, w3, w4, w5, w6, w7)
+    montgomery_reduce(w0, w1, w2, w3, w4, w5, w6, w7)
 }
 
-pub(super) const fn sub(a: U256, b: U256) -> U256 {
-    let a = a.as_limbs();
-    let b = b.as_limbs();
-
-    let (result, _) = sub_inner(
-        a[0],
-        a[1],
-        a[2],
-        a[3],
-        Limb::ZERO,
-        b[0],
-        b[1],
-        b[2],
-        b[3],
-        Limb::ZERO,
-    );
-    U256::new([result[0], result[1], result[2], result[3]])
+// TODO(victor): Drop this function?
+pub(super) fn mul_single(lhs: &FieldElement, rhs: u32) -> FieldElement {
+    multiply(lhs, &FieldElement::from_u64(rhs as u64))
 }
 
-fn from_bytes_wide(bytes: [u8; 64]) -> Self {
+// TODO(victor): Drop this function?
+pub(super) fn double(x: &FieldElement) -> FieldElement {
+    add(x, x)
+}
+
+pub(super) const fn sub(lhs: &FieldElement, rhs: &FieldElement) -> FieldElement {
+    let a = u256_to_u64x4(lhs.0);
+    let b = u256_to_u64x4(rhs.0);
+    sub_inner(a[0], a[1], a[2], a[3], 0, b[0], b[1], b[2], b[3], 0).0
+}
+
+fn from_bytes_wide(bytes: [u8; 64]) -> FieldElement {
     #[allow(clippy::unwrap_used)]
-    FieldElement::montgomery_reduce(
+    montgomery_reduce(
         u64::from_be_bytes(bytes[0..8].try_into().unwrap()),
         u64::from_be_bytes(bytes[8..16].try_into().unwrap()),
         u64::from_be_bytes(bytes[16..24].try_into().unwrap()),
@@ -151,7 +111,7 @@ const fn sub_inner(
     r2: u64,
     r3: u64,
     r4: u64,
-) -> (Self, u64) {
+) -> (FieldElement, u64) {
     let (w0, borrow) = sbb(l0, r0, 0);
     let (w1, borrow) = sbb(l1, r1, borrow);
     let (w2, borrow) = sbb(l2, r2, borrow);
@@ -167,7 +127,7 @@ const fn sub_inner(
     let (w2, carry) = adc(w2, modulus[2] & borrow, carry);
     let (w3, _) = adc(w3, modulus[3] & borrow, carry);
 
-    (Self(u64x4_to_u256([w0, w1, w2, w3])), borrow)
+    (FieldElement(u64x4_to_u256([w0, w1, w2, w3])), borrow)
 }
 
 /// Montgomery Reduction
@@ -220,7 +180,7 @@ const fn montgomery_reduce(
     r5: u64,
     r6: u64,
     r7: u64,
-) -> Self {
+) -> FieldElement {
     let modulus = u256_to_u64x4(MODULUS.0);
 
     let (r1, carry) = mac(r1, r0, modulus[1], r0);
@@ -244,7 +204,7 @@ const fn montgomery_reduce(
     let (r7, r8) = adc(r7, carry2, carry);
 
     // Result may be within MODULUS of the correct value
-    let (result, _) = Self::sub_inner(
+    let (result, _) = sub_inner(
         r4, r5, r6, r7, r8, modulus[0], modulus[1], modulus[2], modulus[3], 0,
     );
     result
@@ -252,13 +212,33 @@ const fn montgomery_reduce(
 
 /// Translate a field element out of the Montgomery domain.
 #[inline]
-pub(crate) const fn to_canonical(self) -> Self {
-    let w = u256_to_u64x4(self.0);
-    FieldElement::montgomery_reduce(w[0], w[1], w[2], w[3], 0, 0, 0, 0)
+pub(super) const fn to_canonical(x: FieldElement) -> FieldElement {
+    let w = u256_to_u64x4(x.0);
+    montgomery_reduce(w[0], w[1], w[2], w[3], 0, 0, 0, 0)
 }
 
 /// Translate a field element into the Montgomery domain.
 #[inline]
-pub(crate) const fn to_montgomery(self) -> Self {
-    Self::multiply(&self, &R2)
+pub(super) fn to_montgomery(x: FieldElement) -> FieldElement {
+    FieldElement::multiply(&x, &R2)
+}
+
+pub(super) fn to_bytes(x: FieldElement) -> FieldBytes {
+    to_canonical(x).0.to_be_byte_array()
+}
+
+pub(super) fn from_uint_unchecked(w: U256) -> FieldElement {
+    to_montgomery(FieldElement(w))
+}
+
+pub fn is_zero(x: &FieldElement) -> Choice {
+    x.ct_eq(&FieldElement::ZERO)
+}
+
+pub(super) fn random(mut rng: impl RngCore) -> FieldElement {
+    // We reduce a random 512-bit value into a 256-bit field, which results in a
+    // negligible bias from the uniform distribution.
+    let mut buf = [0; 64];
+    rng.fill_bytes(&mut buf);
+    from_bytes_wide(buf)
 }

@@ -1,6 +1,6 @@
 //! Field arithmetic modulo p = 2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
 
-#![allow(clippy::assign_op_pattern, clippy::op_ref)]
+#![allow(clippy::assign_op_pattern, clippy::op_ref, unused_qualifications)]
 
 use cfg_if::cfg_if;
 

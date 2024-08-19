@@ -17,7 +17,8 @@
     clippy::unnecessary_cast,
     clippy::too_many_arguments,
     clippy::identity_op,
-    rustdoc::bare_urls
+    rustdoc::bare_urls,
+    unused_qualifications
 )]
 
 // TODO(tarcieri): 32-bit backend?
