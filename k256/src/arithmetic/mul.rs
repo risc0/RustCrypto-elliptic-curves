@@ -353,8 +353,11 @@ fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8> {
     let aff = p.to_affine();
     let mut buffer = [[0u32; 8]; 2];
     // TODO explore pulling array buffer from internal repr
-    let x_bytes: [u8; 32] = aff.x.to_bytes().into();
-    let y_bytes: [u8; 32] = aff.y.to_bytes().into();
+    let mut x_bytes: [u8; 32] = aff.x.to_bytes().into();
+    let mut y_bytes: [u8; 32] = aff.y.to_bytes().into();
+    x_bytes.reverse();
+    y_bytes.reverse();
+
     let x = bytemuck::cast::<_, [u32; 8]>(x_bytes);
     let y = bytemuck::cast::<_, [u32; 8]>(y_bytes);
     let buffer: [[u32; 8]; 2] = [x, y];
@@ -372,8 +375,11 @@ fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8> {
 fn affine_to_projective(affine: &ec::AffinePoint<8>) -> ProjectivePoint {
     // TODO some inefficiencies going through local AffinePoint type
     let value = affine.as_u32s();
-    let x = bytemuck::cast::<_, [u8; 32]>(value[0]);
-    let y = bytemuck::cast::<_, [u8; 32]>(value[1]);
+    let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
+    let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
+    x.reverse();
+    y.reverse();
+
     let affine = crate::AffinePoint::new(
         super::FieldElement::from_bytes_unchecked(&x),
         super::FieldElement::from_bytes_unchecked(&y),
