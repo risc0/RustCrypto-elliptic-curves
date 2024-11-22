@@ -31,7 +31,7 @@ signature = { version = "2", optional = true }
 
 [target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
 risc0-bigint2 = { git = "https://github.com/risc0/risc0.git", rev = "a4f35f87b38318483e518a623fb73db662d59287" }
-bytemuck = "1.19"
+bytemuck = "1"
 
 [dev-dependencies]
 blobby = "0.3"
