@@ -343,7 +343,7 @@ impl LinearCombination<[(ProjectivePoint, Scalar)]> for ProjectivePoint {
 use risc0_bigint2::ec;
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8> {
+fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8, ec::Secp256k1Curve> {
     let aff = p.to_affine();
     let mut buffer = [[0u32; 8]; 2];
     // TODO this could potentially read from internal repr (check risc0 felt endianness)
@@ -358,7 +358,7 @@ fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8> {
 }
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-fn affine_to_projective(affine: &ec::AffinePoint<8>) -> ProjectivePoint {
+fn affine_to_projective(affine: &ec::AffinePoint<8, ec::Secp256k1Curve>) -> ProjectivePoint {
     let value = affine.as_u32s();
     let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
     let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
@@ -393,16 +393,14 @@ fn lincomb(
         return ProjectivePoint::IDENTITY;
     };
 
-    let curve = ec::WeierstrassCurve::secp256k1();
-
     let mut result = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
-    ec::mul(&scalar, &affine, curve, &mut result);
+    affine.mul(&scalar, &mut result);
     let mut result_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
     let mut mul_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
     for (point, scalar) in xks_iter {
-        ec::mul(&scalar, &point, curve, &mut mul_buffer);
+        point.mul(&scalar, &mut mul_buffer);
         // TODO experiment with alternating buffers for perf
-        ec::add(&result, &mul_buffer, curve, &mut result_buffer);
+        result.add(&mul_buffer, &mut result_buffer);
         core::mem::swap(&mut result, &mut result_buffer);
     }
 
