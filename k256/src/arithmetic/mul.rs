@@ -309,6 +309,75 @@ impl LinearCombination<[(ProjectivePoint, Scalar)]> for ProjectivePoint {
     }
 }
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::ec;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8, ec::Secp256k1Curve> {
+    let aff = p.to_affine();
+    let mut buffer = [[0u32; 8]; 2];
+    // TODO this could potentially read from internal repr (check risc0 felt endianness)
+    let mut x_bytes: [u8; 32] = aff.x.to_bytes().into();
+    let mut y_bytes: [u8; 32] = aff.y.to_bytes().into();
+    x_bytes.reverse();
+    y_bytes.reverse();
+
+    let x = bytemuck::cast::<_, [u32; 8]>(x_bytes);
+    let y = bytemuck::cast::<_, [u32; 8]>(y_bytes);
+    ec::AffinePoint::new_unchecked(x, y)
+}
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+fn affine_to_projective(affine: &ec::AffinePoint<8, ec::Secp256k1Curve>) -> ProjectivePoint {
+    let value = affine.as_u32s();
+    let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
+    let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
+    x.reverse();
+    y.reverse();
+
+    let affine = crate::AffinePoint::new(
+        super::FieldElement::from_bytes_unchecked(&x),
+        super::FieldElement::from_bytes_unchecked(&y),
+    );
+    affine.into()
+}
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+fn scalar_to_words(s: &Scalar) -> [u32; 8] {
+    let mut bytes: [u8; 32] = s.to_bytes().into();
+    // U256 is big endian, need to flip to little endian.
+    bytes.reverse();
+    bytemuck::cast::<_, [u32; 8]>(bytes)
+}
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+fn lincomb(
+    xks: &[(ProjectivePoint, Scalar)],
+    tables: &mut [(LookupTable, LookupTable)],
+    digits: &mut [(Radix16Decomposition<33>, Radix16Decomposition<33>)],
+) -> ProjectivePoint {
+    let mut xks_iter = xks
+        .iter()
+        .map(|(p, s)| (projective_to_affine(p), scalar_to_words(s)));
+    let Some((affine, scalar)) = xks_iter.next() else {
+        return ProjectivePoint::IDENTITY;
+    };
+
+    let mut result = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+    affine.mul(&scalar, &mut result);
+    let mut result_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+    let mut mul_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+    for (point, scalar) in xks_iter {
+        point.mul(&scalar, &mut mul_buffer);
+        // TODO experiment with alternating buffers for perf
+        result.add(&mul_buffer, &mut result_buffer);
+        core::mem::swap(&mut result, &mut result_buffer);
+    }
+
+    affine_to_projective(&result)
+}
+
+#[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
 fn lincomb(
     xks: &[(ProjectivePoint, Scalar)],
     tables: &mut [(LookupTable, LookupTable)],
