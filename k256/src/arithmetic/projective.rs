@@ -25,6 +25,14 @@ use elliptic_curve::{
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::ec;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use super::{
+    affine_to_bigint2_affine, affine_to_projective, projective_to_affine, scalar_to_words,
+};
+
 #[rustfmt::skip]
 const ENDOMORPHISM_BETA: FieldElement = FieldElement::from_bytes_unchecked(&[
     0x7a, 0xe9, 0x6a, 0x2b, 0x65, 0x7c, 0x07, 0x10,
@@ -93,6 +101,34 @@ impl ProjectivePoint {
     }
 
     /// Returns `self + other`.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn add(&self, other: &ProjectivePoint) -> ProjectivePoint {
+        let b = other.to_affine();
+        self.add_mixed(&b)
+    }
+
+    /// Returns `self + other`.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn add_mixed(&self, other: &AffinePoint) -> ProjectivePoint {
+        let a = projective_to_affine(self);
+        let b = affine_to_bigint2_affine(other);
+        let mut result = ec::AffinePoint::IDENTITY;
+        a.add(&b, &mut result);
+        affine_to_projective(&result)
+    }
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    /// Doubles this point.
+    #[inline]
+    pub fn double(&self) -> ProjectivePoint {
+        let a = projective_to_affine(self);
+        let mut result = ec::AffinePoint::IDENTITY;
+        a.double(&mut result);
+        affine_to_projective(&result)
+    }
+
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+    /// Returns `self + other`.
     fn add(&self, other: &ProjectivePoint) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
         // (https://eprint.iacr.org/2015/1060 Algorithm 7).
@@ -108,6 +144,7 @@ impl ProjectivePoint {
         let yz_pairs = ((self.y + &self.z) * &(other.y + &other.z)) + &n_yy_zz;
         let xz_pairs = ((self.x + &self.z) * &(other.x + &other.z)) + &n_xx_zz;
 
+        // TODO can remove these to simplify patch (from bigint1)
         if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
             // Same as below, but using mul_single instead of repeated addition to get small
             // multiplications and normalize_weak is removed.
@@ -160,6 +197,7 @@ impl ProjectivePoint {
         }
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     /// Returns `self + other`.
     fn add_mixed(&self, other: &AffinePoint) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
@@ -220,6 +258,7 @@ impl ProjectivePoint {
         ret
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     /// Doubles this point.
     #[inline]
     pub fn double(&self) -> ProjectivePoint {

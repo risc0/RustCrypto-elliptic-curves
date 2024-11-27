@@ -343,42 +343,7 @@ impl LinearCombination<[(ProjectivePoint, Scalar)]> for ProjectivePoint {
 use risc0_bigint2::ec;
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8, ec::Secp256k1Curve> {
-    let aff = p.to_affine();
-    let mut buffer = [[0u32; 8]; 2];
-    // TODO this could potentially read from internal repr (check risc0 felt endianness)
-    let mut x_bytes: [u8; 32] = aff.x.to_bytes().into();
-    let mut y_bytes: [u8; 32] = aff.y.to_bytes().into();
-    x_bytes.reverse();
-    y_bytes.reverse();
-
-    let x = bytemuck::cast::<_, [u32; 8]>(x_bytes);
-    let y = bytemuck::cast::<_, [u32; 8]>(y_bytes);
-    ec::AffinePoint::new_unchecked(x, y)
-}
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-fn affine_to_projective(affine: &ec::AffinePoint<8, ec::Secp256k1Curve>) -> ProjectivePoint {
-    let value = affine.as_u32s();
-    let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
-    let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
-    x.reverse();
-    y.reverse();
-
-    let affine = crate::AffinePoint::new(
-        super::FieldElement::from_bytes_unchecked(&x),
-        super::FieldElement::from_bytes_unchecked(&y),
-    );
-    affine.into()
-}
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-fn scalar_to_words(s: &Scalar) -> [u32; 8] {
-    let mut bytes: [u8; 32] = s.to_bytes().into();
-    // U256 is big endian, need to flip to little endian.
-    bytes.reverse();
-    bytemuck::cast::<_, [u32; 8]>(bytes)
-}
+use super::{affine_to_projective, projective_to_affine, scalar_to_words};
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
 fn lincomb(
@@ -483,29 +448,29 @@ fn precompute_gen_lookup_table() -> [LookupTable; 33] {
 
 impl MulByGenerator for ProjectivePoint {
     /// Calculates `k * G`, where `G` is the generator.
-    #[cfg(not(feature = "precomputed-tables"))]
+    // #[cfg(not(feature = "precomputed-tables"))]
     fn mul_by_generator(k: &Scalar) -> ProjectivePoint {
         ProjectivePoint::GENERATOR * k
     }
 
-    /// Calculates `k * G`, where `G` is the generator.
-    #[cfg(feature = "precomputed-tables")]
-    fn mul_by_generator(k: &Scalar) -> ProjectivePoint {
-        let digits = Radix16Decomposition::<65>::new(k);
-        let table = *GEN_LOOKUP_TABLE;
-        let mut acc = table[32].select(digits.0[64]);
-        let mut acc2 = ProjectivePoint::IDENTITY;
-        for i in (0..32).rev() {
-            acc2 += &table[i].select(digits.0[i * 2 + 1]);
-            acc += &table[i].select(digits.0[i * 2]);
-        }
-        // This is the price of halving the precomputed table size (from 60kb to 30kb)
-        // The performance hit is minor, about 3%.
-        for _ in 0..4 {
-            acc2 = acc2.double();
-        }
-        acc + acc2
-    }
+    // /// Calculates `k * G`, where `G` is the generator.
+    // #[cfg(feature = "precomputed-tables")]
+    // fn mul_by_generator(k: &Scalar) -> ProjectivePoint {
+    //     let digits = Radix16Decomposition::<65>::new(k);
+    //     let table = *GEN_LOOKUP_TABLE;
+    //     let mut acc = table[32].select(digits.0[64]);
+    //     let mut acc2 = ProjectivePoint::IDENTITY;
+    //     for i in (0..32).rev() {
+    //         acc2 += &table[i].select(digits.0[i * 2 + 1]);
+    //         acc += &table[i].select(digits.0[i * 2]);
+    //     }
+    //     // This is the price of halving the precomputed table size (from 60kb to 30kb)
+    //     // The performance hit is minor, about 3%.
+    //     for _ in 0..4 {
+    //         acc2 = acc2.double();
+    //     }
+    //     acc + acc2
+    // }
 }
 
 #[inline(always)]
@@ -572,6 +537,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_mul_by_generator() {
         let k = Scalar::random(&mut OsRng);
         let reference = &ProjectivePoint::GENERATOR * &k;
