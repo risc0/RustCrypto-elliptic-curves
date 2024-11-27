@@ -537,7 +537,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_mul_by_generator() {
         let k = Scalar::random(&mut OsRng);
         let reference = &ProjectivePoint::GENERATOR * &k;
