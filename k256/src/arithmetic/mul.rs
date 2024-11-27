@@ -448,29 +448,29 @@ fn precompute_gen_lookup_table() -> [LookupTable; 33] {
 
 impl MulByGenerator for ProjectivePoint {
     /// Calculates `k * G`, where `G` is the generator.
-    // #[cfg(not(feature = "precomputed-tables"))]
+    #[cfg(not(feature = "precomputed-tables"))]
     fn mul_by_generator(k: &Scalar) -> ProjectivePoint {
         ProjectivePoint::GENERATOR * k
     }
 
-    // /// Calculates `k * G`, where `G` is the generator.
-    // #[cfg(feature = "precomputed-tables")]
-    // fn mul_by_generator(k: &Scalar) -> ProjectivePoint {
-    //     let digits = Radix16Decomposition::<65>::new(k);
-    //     let table = *GEN_LOOKUP_TABLE;
-    //     let mut acc = table[32].select(digits.0[64]);
-    //     let mut acc2 = ProjectivePoint::IDENTITY;
-    //     for i in (0..32).rev() {
-    //         acc2 += &table[i].select(digits.0[i * 2 + 1]);
-    //         acc += &table[i].select(digits.0[i * 2]);
-    //     }
-    //     // This is the price of halving the precomputed table size (from 60kb to 30kb)
-    //     // The performance hit is minor, about 3%.
-    //     for _ in 0..4 {
-    //         acc2 = acc2.double();
-    //     }
-    //     acc + acc2
-    // }
+    /// Calculates `k * G`, where `G` is the generator.
+    #[cfg(feature = "precomputed-tables")]
+    fn mul_by_generator(k: &Scalar) -> ProjectivePoint {
+        let digits = Radix16Decomposition::<65>::new(k);
+        let table = *GEN_LOOKUP_TABLE;
+        let mut acc = table[32].select(digits.0[64]);
+        let mut acc2 = ProjectivePoint::IDENTITY;
+        for i in (0..32).rev() {
+            acc2 += &table[i].select(digits.0[i * 2 + 1]);
+            acc += &table[i].select(digits.0[i * 2]);
+        }
+        // This is the price of halving the precomputed table size (from 60kb to 30kb)
+        // The performance hit is minor, about 3%.
+        for _ in 0..4 {
+            acc2 = acc2.double();
+        }
+        acc + acc2
+    }
 }
 
 #[inline(always)]
