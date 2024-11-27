@@ -31,7 +31,7 @@ signature = { version = "2", optional = true }
 
 [target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
 # risc0-bigint2 = { version = "1.2.0-rc.1", features = ["unstable"] }
-risc0-bigint2 = { path = "../../../risc0/risc0/risc0/bigint2", features = ["unstable"] }
+risc0-bigint2 = { git = "https://github.com/risc0/risc0.git", rev = "aada43f38ab2dd308743f85d51557b11c5f4d6be", features = ["unstable"] }
 bytemuck = "1"
 
 [dev-dependencies]
