@@ -68,10 +68,7 @@ pub(crate) fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8, ec
 pub(crate) fn affine_to_projective(
     affine: &ec::AffinePoint<8, ec::Secp256k1Curve>,
 ) -> ProjectivePoint {
-    if affine.is_zero() {
-        ProjectivePoint::IDENTITY
-    } else {
-        let value = affine.as_u32s();
+    if let Some(value) = affine.as_u32s() {
         let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
         let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
         x.reverse();
@@ -82,6 +79,8 @@ pub(crate) fn affine_to_projective(
             FieldElement::from_bytes_unchecked(&y),
         )
         .into()
+    } else {
+        ProjectivePoint::IDENTITY
     }
 }
 
