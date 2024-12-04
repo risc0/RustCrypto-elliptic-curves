@@ -360,16 +360,20 @@ fn lincomb(
 
     let mut result = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
     affine.mul(&scalar, &mut result);
-    let mut result_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+    let mut buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
     let mut mul_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+
+    let mut result_ptr = &mut result;
+    let mut buffer_ptr = &mut buffer;
+
     for (point, scalar) in xks_iter {
         point.mul(&scalar, &mut mul_buffer);
-        // TODO experiment with alternating buffers for perf
-        result.add(&mul_buffer, &mut result_buffer);
-        core::mem::swap(&mut result, &mut result_buffer);
+        result_ptr.add(&mul_buffer, &mut buffer_ptr);
+        core::mem::swap(&mut result_ptr, &mut buffer_ptr);
     }
 
-    affine_to_projective(&result)
+    // Convert the final result back to projective form
+    affine_to_projective(result_ptr)
 }
 
 #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
