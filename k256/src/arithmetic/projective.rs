@@ -257,8 +257,8 @@ impl ProjectivePoint {
         ret
     }
 
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     /// Doubles this point.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     #[inline]
     pub fn double(&self) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
