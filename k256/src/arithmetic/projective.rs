@@ -117,8 +117,8 @@ impl ProjectivePoint {
         affine_to_projective(&result)
     }
 
-    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
     /// Doubles this point.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
     #[inline]
     pub fn double(&self) -> ProjectivePoint {
         let a = projective_to_affine(self);
