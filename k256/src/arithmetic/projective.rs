@@ -196,8 +196,8 @@ impl ProjectivePoint {
         }
     }
 
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     /// Returns `self + other`.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn add_mixed(&self, other: &AffinePoint) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
         // (https://eprint.iacr.org/2015/1060 Algorithm 8).
