@@ -1044,9 +1044,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-bigint2"
-version = "1.2.0-rc.2"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f343e31771b9ce9f2383a2412338640a5963f8c62a6ea88b7330d15489ee2a1"
+checksum = "4f4c185a3bfaee681eed5bfac1440128184bf0b6544c345fb4d7bd4317c909fb"
 dependencies = [
  "include_bytes_aligned",
  "stability",
