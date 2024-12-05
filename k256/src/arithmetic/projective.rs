@@ -144,7 +144,6 @@ impl ProjectivePoint {
         let yz_pairs = ((self.y + &self.z) * &(other.y + &other.z)) + &n_yy_zz;
         let xz_pairs = ((self.x + &self.z) * &(other.x + &other.z)) + &n_xx_zz;
 
-        // TODO can remove these to simplify patch (from bigint1)
         if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
             // Same as below, but using mul_single instead of repeated addition to get small
             // multiplications and normalize_weak is removed.
