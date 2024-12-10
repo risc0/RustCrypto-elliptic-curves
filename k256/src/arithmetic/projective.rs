@@ -25,6 +25,14 @@ use elliptic_curve::{
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::ec;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use super::{
+    affine_to_bigint2_affine, affine_to_projective, projective_to_affine, scalar_to_words,
+};
+
 #[rustfmt::skip]
 const ENDOMORPHISM_BETA: FieldElement = FieldElement::from_bytes_unchecked(&[
     0x7a, 0xe9, 0x6a, 0x2b, 0x65, 0x7c, 0x07, 0x10,
@@ -93,6 +101,34 @@ impl ProjectivePoint {
     }
 
     /// Returns `self + other`.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn add(&self, other: &ProjectivePoint) -> ProjectivePoint {
+        let b = other.to_affine();
+        self.add_mixed(&b)
+    }
+
+    /// Returns `self + other`.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn add_mixed(&self, other: &AffinePoint) -> ProjectivePoint {
+        let a = projective_to_affine(self);
+        let b = affine_to_bigint2_affine(other);
+        let mut result = ec::AffinePoint::IDENTITY;
+        a.add(&b, &mut result);
+        affine_to_projective(&result)
+    }
+
+    /// Doubles this point.
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    #[inline]
+    pub fn double(&self) -> ProjectivePoint {
+        let a = projective_to_affine(self);
+        let mut result = ec::AffinePoint::IDENTITY;
+        a.double(&mut result);
+        affine_to_projective(&result)
+    }
+
+    /// Returns `self + other`.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn add(&self, other: &ProjectivePoint) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
         // (https://eprint.iacr.org/2015/1060 Algorithm 7).
@@ -107,30 +143,6 @@ impl ProjectivePoint {
         let xy_pairs = ((self.x + &self.y) * &(other.x + &other.y)) + &n_xx_yy;
         let yz_pairs = ((self.y + &self.z) * &(other.y + &other.z)) + &n_yy_zz;
         let xz_pairs = ((self.x + &self.z) * &(other.x + &other.z)) + &n_xx_zz;
-
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            // Same as below, but using mul_single instead of repeated addition to get small
-            // multiplications and normalize_weak is removed.
-            let bzz3 = zz.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-
-            let yy_m_bzz3 = yy + &bzz3.negate(1);
-            let yy_p_bzz3 = yy + &bzz3;
-
-            let byz3 = &yz_pairs.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-
-            let xx3 = xx.mul_single(3);
-            let bxx9 = xx3.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-
-            let new_x = (xy_pairs * &yy_m_bzz3) + &(byz3 * &xz_pairs).negate(1); // m1
-            let new_y = (yy_p_bzz3 * &yy_m_bzz3) + &(bxx9 * &xz_pairs);
-            let new_z = (yz_pairs * &yy_p_bzz3) + &(xx3 * &xy_pairs);
-
-            return ProjectivePoint {
-                x: new_x,
-                y: new_y,
-                z: new_z,
-            };
-        }
 
         let bzz = zz.mul_single(CURVE_EQUATION_B_SINGLE);
         let bzz3 = (bzz.double() + &bzz).normalize_weak();
@@ -161,6 +173,7 @@ impl ProjectivePoint {
     }
 
     /// Returns `self + other`.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn add_mixed(&self, other: &AffinePoint) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
         // (https://eprint.iacr.org/2015/1060 Algorithm 8).
@@ -170,29 +183,6 @@ impl ProjectivePoint {
         let xy_pairs = ((self.x + &self.y) * &(other.x + &other.y)) + &(xx + &yy).negate(2);
         let yz_pairs = (other.y * &self.z) + &self.y;
         let xz_pairs = (other.x * &self.z) + &self.x;
-
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            // Same as below, but using mul_single instead of repeated addition to get small
-            // multiplications and normalize_weak is removed.
-            let bzz3 = self.z.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-
-            let yy_m_bzz3 = yy + &bzz3.negate(1);
-            let yy_p_bzz3 = yy + &bzz3;
-
-            let n_byz3 =
-                &yz_pairs.mul(&FieldElement::from_i64(CURVE_EQUATION_B_SINGLE as i64 * -3));
-
-            let xx3 = xx.mul_single(3);
-            let bxx9 = xx3.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-
-            let mut ret = ProjectivePoint {
-                x: (xy_pairs * &yy_m_bzz3) + &(n_byz3 * &xz_pairs),
-                y: (yy_p_bzz3 * &yy_m_bzz3) + &(bxx9 * &xz_pairs),
-                z: (yz_pairs * &yy_p_bzz3) + &(xx3 * &xy_pairs),
-            };
-            ret.conditional_assign(self, other.is_identity());
-            return ret;
-        }
 
         let bzz = &self.z.mul_single(CURVE_EQUATION_B_SINGLE);
         let bzz3 = (bzz.double() + bzz).normalize_weak();
@@ -221,6 +211,7 @@ impl ProjectivePoint {
     }
 
     /// Doubles this point.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     #[inline]
     pub fn double(&self) -> ProjectivePoint {
         // We implement the complete addition formula from Renes-Costello-Batina 2015
@@ -229,25 +220,6 @@ impl ProjectivePoint {
         let yy = self.y.square();
         let zz = self.z.square();
         let xy2 = (self.x * &self.y).double();
-
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            // Same as below, but using mul_single instead of repeated addition to get small
-            // multiplications and normalize_weak is removed.
-            let bzz3 = zz.mul_single(CURVE_EQUATION_B_SINGLE * 3);
-            let n_bzz9 = zz.mul(&FieldElement::from_i64(CURVE_EQUATION_B_SINGLE as i64 * -9));
-
-            let yy_m_bzz9 = yy + &n_bzz9;
-            let yy_p_bzz3 = yy + &bzz3;
-
-            let yy_zz = yy * &zz;
-            let t = yy_zz.mul_single(CURVE_EQUATION_B_SINGLE * 24);
-
-            return ProjectivePoint {
-                x: xy2 * &yy_m_bzz9,
-                y: ((yy_m_bzz9 * &yy_p_bzz3) + &t),
-                z: ((yy * &self.y) * &self.z).mul_single(8),
-            };
-        }
 
         let bzz = &zz.mul_single(CURVE_EQUATION_B_SINGLE);
         let bzz3 = (bzz.double() + bzz).normalize_weak();
