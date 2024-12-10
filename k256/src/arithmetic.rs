@@ -33,6 +33,65 @@ pub(crate) const CURVE_EQUATION_B: FieldElement = FieldElement::from_bytes_unche
     0, 0, 0, 0, 0, 0, 0, CURVE_EQUATION_B_SINGLE as u8,
 ]);
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::ec;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use ecdsa_core::elliptic_curve::group::prime::PrimeCurveAffine;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub(crate) fn affine_to_bigint2_affine(
+    affine: &AffinePoint,
+) -> ec::AffinePoint<8, ec::Secp256k1Curve> {
+    if affine.is_identity().into() {
+        return ec::AffinePoint::IDENTITY;
+    }
+    let mut buffer = [[0u32; 8]; 2];
+    // TODO this could potentially read from internal repr (check risc0 felt endianness)
+    let mut x_bytes: [u8; 32] = affine.x.to_bytes().into();
+    let mut y_bytes: [u8; 32] = affine.y.to_bytes().into();
+    x_bytes.reverse();
+    y_bytes.reverse();
+
+    let x = bytemuck::cast::<_, [u32; 8]>(x_bytes);
+    let y = bytemuck::cast::<_, [u32; 8]>(y_bytes);
+    ec::AffinePoint::new_unchecked(x, y)
+}
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub(crate) fn projective_to_affine(p: &ProjectivePoint) -> ec::AffinePoint<8, ec::Secp256k1Curve> {
+    let aff = p.to_affine();
+    affine_to_bigint2_affine(&aff)
+}
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub(crate) fn affine_to_projective(
+    affine: &ec::AffinePoint<8, ec::Secp256k1Curve>,
+) -> ProjectivePoint {
+    if let Some(value) = affine.as_u32s() {
+        let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
+        let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
+        x.reverse();
+        y.reverse();
+
+        crate::AffinePoint::new(
+            FieldElement::from_bytes_unchecked(&x),
+            FieldElement::from_bytes_unchecked(&y),
+        )
+        .into()
+    } else {
+        ProjectivePoint::IDENTITY
+    }
+}
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub(crate) fn scalar_to_words(s: &Scalar) -> [u32; 8] {
+    let mut bytes: [u8; 32] = s.to_bytes().into();
+    // U256 is big endian, need to flip to little endian.
+    bytes.reverse();
+    bytemuck::cast::<_, [u32; 8]>(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::CURVE_EQUATION_B;
