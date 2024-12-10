@@ -339,6 +339,44 @@ impl LinearCombination<[(ProjectivePoint, Scalar)]> for ProjectivePoint {
     }
 }
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::ec;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use super::{affine_to_projective, projective_to_affine, scalar_to_words};
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+fn lincomb(
+    xks: &[(ProjectivePoint, Scalar)],
+    tables: &mut [(LookupTable, LookupTable)],
+    digits: &mut [(Radix16Decomposition<33>, Radix16Decomposition<33>)],
+) -> ProjectivePoint {
+    let mut xks_iter = xks
+        .iter()
+        .map(|(p, s)| (projective_to_affine(p), scalar_to_words(s)));
+    let Some((affine, scalar)) = xks_iter.next() else {
+        return ProjectivePoint::IDENTITY;
+    };
+
+    let mut result = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+    affine.mul(&scalar, &mut result);
+    let mut buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+    let mut mul_buffer = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+
+    let mut result_ptr = &mut result;
+    let mut buffer_ptr = &mut buffer;
+
+    for (point, scalar) in xks_iter {
+        point.mul(&scalar, &mut mul_buffer);
+        result_ptr.add(&mul_buffer, &mut buffer_ptr);
+        core::mem::swap(&mut result_ptr, &mut buffer_ptr);
+    }
+
+    // Convert the final result back to projective form
+    affine_to_projective(result_ptr)
+}
+
+#[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
 fn lincomb(
     xks: &[(ProjectivePoint, Scalar)],
     tables: &mut [(LookupTable, LookupTable)],
