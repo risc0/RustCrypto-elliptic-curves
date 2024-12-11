@@ -169,6 +169,7 @@ mod tests {
         impl_field_identity_tests, impl_field_invert_tests, impl_field_sqrt_tests,
         impl_primefield_tests,
     };
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::{num, prelude::*};
 
     /// t = (modulus - 1) >> S
@@ -263,6 +264,7 @@ mod tests {
         assert_eq!(two.pow_vartime(&[2, 0, 0, 0]), four);
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     proptest! {
         /// This checks behaviour well within the field ranges, because it doesn't set the
         /// highest limb.

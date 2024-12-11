@@ -108,6 +108,7 @@ mod tests {
         Curve, Field,
     };
     use hex_literal::hex;
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::{num::u64::ANY, prelude::ProptestConfig, proptest};
     use sha2::Sha256;
 
@@ -289,6 +290,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn from_okm_fuzz() {
         let mut wide_order = GenericArray::default();
         wide_order[16..].copy_from_slice(&NistP256::ORDER.to_be_byte_array());
