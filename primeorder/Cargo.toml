@@ -22,8 +22,9 @@ elliptic-curve = { version = "0.13", default-features = false, features = ["arit
 # optional dependencies
 serdect = { version = "0.2", optional = true, default-features = false }
 
-# [target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
+[target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
 risc0-bigint2 = { version = "1.2.0", features = ["unstable"] }
+bytemuck = "1"
 
 [features]
 std = ["elliptic-curve/std"]
