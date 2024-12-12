@@ -21,9 +21,40 @@ pub use elliptic_curve::{self, point::Double, Field, FieldBytes, PrimeCurve, Pri
 
 use elliptic_curve::CurveArithmetic;
 
+// /// Parameters for elliptic curves of prime order which can be described by the
+// /// short Weierstrass equation.
+// #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+// pub trait PrimeCurveParams:
+//     PrimeCurve
+//     + CurveArithmetic
+//     + CurveArithmetic<AffinePoint = AffinePoint<Self>>
+//     + CurveArithmetic<ProjectivePoint = ProjectivePoint<Self>>
+// {
+//     /// Base field element type.
+//     type FieldElement: PrimeField<Repr = FieldBytes<Self>>;
+
+//     /// [Point arithmetic](point_arithmetic) implementation, might be optimized for this specific curve
+//     type PointArithmetic: point_arithmetic::PointArithmetic<Self>;
+
+//     /// Coefficient `a` in the curve equation.
+//     const EQUATION_A: Self::FieldElement;
+
+//     /// Coefficient `b` in the curve equation.
+//     const EQUATION_B: Self::FieldElement;
+
+//     /// Generator point's affine coordinates: (x, y).
+//     const GENERATOR: (Self::FieldElement, Self::FieldElement);
+// }
+
+// #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::ec;
 /// Parameters for elliptic curves of prime order which can be described by the
 /// short Weierstrass equation.
+// #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
 pub trait PrimeCurveParams:
+    // TODO this doesn't support different bit widths
+    ec::Curve<{ec::EC_256_WIDTH_WORDS}> + 
+    Sized +
     PrimeCurve
     + CurveArithmetic
     + CurveArithmetic<AffinePoint = AffinePoint<Self>>

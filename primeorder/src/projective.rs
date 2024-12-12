@@ -101,46 +101,47 @@ where
     where
         Self: Double,
     {
-        let k = Into::<C::Uint>::into(*k).to_le_byte_array();
+        todo!()
+        // let k = Into::<C::Uint>::into(*k).to_le_byte_array();
 
-        let mut pc = [Self::default(); 16];
-        pc[0] = Self::IDENTITY;
-        pc[1] = *self;
+        // let mut pc = [Self::default(); 16];
+        // pc[0] = Self::IDENTITY;
+        // pc[1] = *self;
 
-        for i in 2..16 {
-            pc[i] = if i % 2 == 0 {
-                Double::double(&pc[i / 2])
-            } else {
-                pc[i - 1].add(self)
-            };
-        }
+        // for i in 2..16 {
+        //     pc[i] = if i % 2 == 0 {
+        //         Double::double(&pc[i / 2])
+        //     } else {
+        //         pc[i - 1].add(self)
+        //     };
+        // }
 
-        let mut q = Self::IDENTITY;
-        let mut pos = C::Uint::BITS - 4;
+        // let mut q = Self::IDENTITY;
+        // let mut pos = C::Uint::BITS - 4;
 
-        loop {
-            let slot = (k[pos >> 3] >> (pos & 7)) & 0xf;
+        // loop {
+        //     let slot = (k[pos >> 3] >> (pos & 7)) & 0xf;
 
-            let mut t = ProjectivePoint::IDENTITY;
+        //     let mut t = ProjectivePoint::IDENTITY;
 
-            for i in 1..16 {
-                t.conditional_assign(
-                    &pc[i],
-                    Choice::from(((slot as usize ^ i).wrapping_sub(1) >> 8) as u8 & 1),
-                );
-            }
+        //     for i in 1..16 {
+        //         t.conditional_assign(
+        //             &pc[i],
+        //             Choice::from(((slot as usize ^ i).wrapping_sub(1) >> 8) as u8 & 1),
+        //         );
+        //     }
 
-            q = q.add(&t);
+        //     q = q.add(&t);
 
-            if pos == 0 {
-                break;
-            }
+        //     if pos == 0 {
+        //         break;
+        //     }
 
-            q = Double::double(&Double::double(&Double::double(&Double::double(&q))));
-            pos -= 4;
-        }
+        //     q = Double::double(&Double::double(&Double::double(&Double::double(&q))));
+        //     pos -= 4;
+        // }
 
-        q
+        // q
     }
 }
 
