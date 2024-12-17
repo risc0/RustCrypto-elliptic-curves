@@ -55,7 +55,27 @@ primeorder::impl_mont_field_element!(
 
 impl FieldElement {
     /// Returns the multiplicative inverse of self, if self is non-zero.
+    #[inline(never)]
     pub fn invert(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::elliptic_curve::bigint::Encoding;
+
+            let canonical = self.to_canonical();
+            let input = canonical.to_le_bytes();
+            let input_words = bytemuck::cast::<_, [u32; 8]>(input);
+            let mut output = [0u32; 8];
+            risc0_bigint2::field::modinv_256(
+                &input_words,
+                &crate::risc0::SECP256R1_PRIME,
+                &mut output,
+            );
+            let bytes = bytemuck::cast_slice::<u32, u8>(&output);
+            let res = FieldElement::from_uint(U256::from_le_slice(bytes));
+            res
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         CtOption::new(self.invert_unchecked(), !self.is_zero())
     }
 
@@ -63,6 +83,9 @@ impl FieldElement {
     ///
     /// Does not check that self is non-zero.
     const fn invert_unchecked(&self) -> Self {
+        // NOTE: It is fine that the internal invert function is not overriden for the zkvm, as this
+        // is only called in compile time constants given `invert` is overridden.
+
         // We need to find b such that b * a ≡ 1 mod p. As we are in a prime
         // field, we can apply Fermat's Little Theorem:
         //
