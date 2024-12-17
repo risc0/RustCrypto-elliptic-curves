@@ -131,6 +131,24 @@ impl Scalar {
 
     /// Returns the multiplicative inverse of self, if self is non-zero
     pub fn invert(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::elliptic_curve::bigint::Encoding;
+
+            let input = self.0.to_le_bytes();
+            let input_words = bytemuck::cast::<_, [u32; 8]>(input);
+            let mut output = [0u32; 8];
+            risc0_bigint2::field::modinv_256(
+                &input_words,
+                &crate::risc0::SECP256R1_ORDER,
+                &mut output,
+            );
+            let bytes = bytemuck::cast_slice::<u32, u8>(&output);
+            let res = Scalar(U256::from_le_slice(bytes));
+            CtOption::new(res, !res.is_zero())
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         CtOption::new(self.invert_unchecked(), !self.is_zero())
     }
 
@@ -363,49 +381,57 @@ impl Invert for Scalar {
     /// sidechannels.
     #[allow(non_snake_case)]
     fn invert_vartime(&self) -> CtOption<Self> {
-        let mut u = *self;
-        let mut v = Self(MODULUS);
-        let mut A = Self::ONE;
-        let mut C = Self::ZERO;
-
-        while !bool::from(u.is_zero()) {
-            // u-loop
-            while bool::from(u.is_even()) {
-                u >>= 1;
-
-                let was_odd: bool = A.is_odd().into();
-                A >>= 1;
-
-                if was_odd {
-                    A += FRAC_MODULUS_2;
-                    A += Self::ONE;
-                }
-            }
-
-            // v-loop
-            while bool::from(v.is_even()) {
-                v >>= 1;
-
-                let was_odd: bool = C.is_odd().into();
-                C >>= 1;
-
-                if was_odd {
-                    C += FRAC_MODULUS_2;
-                    C += Self::ONE;
-                }
-            }
-
-            // sub-step
-            if u >= v {
-                u -= &v;
-                A -= &C;
-            } else {
-                v -= &u;
-                C -= &A;
-            }
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            self.invert()
         }
 
-        CtOption::new(C, !self.is_zero())
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+        {
+            let mut u = *self;
+            let mut v = Self(MODULUS);
+            let mut A = Self::ONE;
+            let mut C = Self::ZERO;
+
+            while !bool::from(u.is_zero()) {
+                // u-loop
+                while bool::from(u.is_even()) {
+                    u >>= 1;
+
+                    let was_odd: bool = A.is_odd().into();
+                    A >>= 1;
+
+                    if was_odd {
+                        A += FRAC_MODULUS_2;
+                        A += Self::ONE;
+                    }
+                }
+
+                // v-loop
+                while bool::from(v.is_even()) {
+                    v >>= 1;
+
+                    let was_odd: bool = C.is_odd().into();
+                    C >>= 1;
+
+                    if was_odd {
+                        C += FRAC_MODULUS_2;
+                        C += Self::ONE;
+                    }
+                }
+
+                // sub-step
+                if u >= v {
+                    u -= &v;
+                    A -= &C;
+                } else {
+                    v -= &u;
+                    C -= &A;
+                }
+            }
+
+            CtOption::new(C, !self.is_zero())
+        }
     }
 }
 
