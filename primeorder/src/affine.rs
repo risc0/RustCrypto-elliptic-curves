@@ -137,33 +137,38 @@ where
 
             // Note: buffers are kept separate for each OP as the result pointer cannot equal one
             // of the input pointers.
-            let mut buffer = FieldElement256::<C>::default();
+            let mut scratch = FieldElement256::<C>::default();
             let mut acc = FieldElement256::<C>::default();
-            let mut x_buffer = FieldElement256::<C>::from(x_bytes);
+            let mut scratch_1 = FieldElement256::<C>::from(x_bytes);
 
             // x checked to be in the field.
             C::FieldElement::from_repr(*x_bytes).and_then(|x| {
                 // x * &x * &x
-                x_buffer.mul_unchecked(&x_buffer, &mut buffer);
-                buffer.mul_unchecked(&x_buffer, &mut acc);
+                scratch_1.mul_unchecked(&scratch_1, &mut scratch);
+                scratch.mul_unchecked(&scratch_1, &mut acc);
 
                 // + &(C::EQUATION_A * &x)
-                x_buffer.mul_unchecked(&C::EQUATION_A_LE, &mut buffer);
+                scratch_1.mul_unchecked(&C::EQUATION_A_LE, &mut scratch);
                 // Can re-use x as a buffer, no longer needed.
-                buffer.add_unchecked(&acc, &mut x_buffer);
+                scratch.add_unchecked(&acc, &mut scratch_1);
 
                 // + &C::EQUATION_B
-                x_buffer.add_unchecked(&C::EQUATION_B_LE, &mut acc);
+                scratch_1.add_unchecked(&C::EQUATION_B_LE, &mut scratch);
 
-                // Sqrt implementation. Not separated into another function to allow 
+                // Sqrt implementation. Not separated into another function to allow
                 // re-using buffers.
+                scratch.sqrt_unchecked(&mut scratch_1, &mut acc);
+
+                // Check that the square root is correct.
+                acc.square(&mut scratch_1);
+
+                let sqrt = CtOption::new(acc, Choice::from(scratch_1.eq(&scratch) as u8));
 
                 // Checked that the result is within the field.
-                C::FieldElement::from_repr(acc.into()).and_then(|acc| {
-                    let beta = acc.sqrt();
-
-                    beta.map(|beta| {
+                sqrt.and_then(|sqrt| {
+                    C::FieldElement::from_repr(sqrt.into()).map(|beta| {
                         let y = C::FieldElement::conditional_select(
+                            // TODO this neg can be accelerated too
                             &-beta,
                             &beta,
                             beta.is_odd().ct_eq(&y_is_odd),
