@@ -138,7 +138,7 @@ impl Scalar {
             let input = self.0.to_le_bytes();
             let input_words = bytemuck::cast::<_, [u32; 8]>(input);
             let mut output = [0u32; 8];
-            risc0_bigint2::field::modinv_256(
+            risc0_bigint2::field::modinv_256_unchecked(
                 &input_words,
                 &crate::risc0::SECP256R1_ORDER,
                 &mut output,

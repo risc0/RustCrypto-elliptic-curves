@@ -65,14 +65,13 @@ impl FieldElement {
             let input = canonical.to_le_bytes();
             let input_words = bytemuck::cast::<_, [u32; 8]>(input);
             let mut output = [0u32; 8];
-            risc0_bigint2::field::modinv_256(
+            risc0_bigint2::field::modinv_256_unchecked(
                 &input_words,
                 &crate::risc0::SECP256R1_PRIME,
                 &mut output,
             );
             let bytes = bytemuck::cast_slice::<u32, u8>(&output);
-            let res = FieldElement::from_uint(U256::from_le_slice(bytes));
-            res
+            FieldElement::from_uint(U256::from_le_slice(bytes))
         }
 
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
