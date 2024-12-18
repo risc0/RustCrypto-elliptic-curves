@@ -16,6 +16,9 @@ mod dev;
 mod field;
 mod projective;
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub mod risc0;
+
 pub use crate::{affine::AffinePoint, projective::ProjectivePoint};
 pub use elliptic_curve::{self, point::Double, Field, FieldBytes, PrimeCurve, PrimeField};
 
@@ -75,4 +78,18 @@ pub trait PrimeCurveParams:
 
     /// Generator point's affine coordinates: (x, y).
     const GENERATOR: (Self::FieldElement, Self::FieldElement);
+
+    ///  Curve prime in little-endian words to be compatible with risc0 expected layout.
+    const PRIME_LE_WORDS: [u32; 8];
+
+    /// Order of the curve in little-endian words to be compatible with risc0 expected layout.
+    const ORDER_LE_WORDS: [u32; 8];
+
+    /// Coefficient `a` in the curve equation in little-endian words to be compatible with risc0
+    /// expected layout.
+    const EQUATION_A_LE: risc0::FieldElement256<Self>;
+
+    /// Coefficient `b` in the curve equation in little-endian words to be compatible with risc0
+    /// expected layout.
+    const EQUATION_B_LE: risc0::FieldElement256<Self>;
 }

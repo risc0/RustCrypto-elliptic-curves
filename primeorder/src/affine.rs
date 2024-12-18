@@ -131,6 +131,51 @@ where
     FieldBytes<C>: Copy,
 {
     fn decompress(x_bytes: &FieldBytes<C>, y_is_odd: Choice) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::risc0::FieldElement256;
+
+            // Note: buffers are kept separate for each OP as the result pointer cannot equal one
+            // of the input pointers.
+            let mut buffer = FieldElement256::<C>::default();
+            let mut acc = FieldElement256::<C>::default();
+            let mut x_buffer = FieldElement256::<C>::from(x_bytes);
+
+            // x checked to be in the field.
+            C::FieldElement::from_repr(*x_bytes).and_then(|x| {
+                // x * &x * &x
+                x_buffer.mul_unchecked(&x_buffer, &mut buffer);
+                buffer.mul_unchecked(&x_buffer, &mut acc);
+
+                // + &(C::EQUATION_A * &x)
+                x_buffer.mul_unchecked(&C::EQUATION_A_LE, &mut buffer);
+                // Can re-use x as a buffer, no longer needed.
+                buffer.add_unchecked(&acc, &mut x_buffer);
+
+                // + &C::EQUATION_B
+                x_buffer.add_unchecked(&C::EQUATION_B_LE, &mut acc);
+
+                // Sqrt implementation. Not separated into another function to allow 
+                // re-using buffers.
+
+                // Checked that the result is within the field.
+                C::FieldElement::from_repr(acc.into()).and_then(|acc| {
+                    let beta = acc.sqrt();
+
+                    beta.map(|beta| {
+                        let y = C::FieldElement::conditional_select(
+                            &-beta,
+                            &beta,
+                            beta.is_odd().ct_eq(&y_is_odd),
+                        );
+
+                        Self { x, y, infinity: 0 }
+                    })
+                })
+            })
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         C::FieldElement::from_repr(*x_bytes).and_then(|x| {
             let alpha = x * &x * &x + &(C::EQUATION_A * &x) + &C::EQUATION_B;
             let beta = alpha.sqrt();

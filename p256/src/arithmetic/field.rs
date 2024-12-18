@@ -114,6 +114,8 @@ impl FieldElement {
         //     alpha = ± beta^((p + 1) / 4) mod p
         //
         // Thus sqrt can be implemented with a single exponentiation.
+        
+        // TODO apply acceleration
 
         let t11 = self.mul(&self.square());
         let t1111 = t11.mul(&t11.sqn(2));

@@ -31,6 +31,9 @@ impl PrimeCurveArithmetic for NistP256 {
     type CurveGroup = ProjectivePoint;
 }
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use primeorder::risc0::FieldElement256;
+
 /// Adapted from [NIST SP 800-186] § G.1.2: Curve P-256.
 ///
 /// [NIST SP 800-186]: https://csrc.nist.gov/publications/detail/sp/800-186/final
@@ -56,4 +59,18 @@ impl PrimeCurveParams for NistP256 {
         FieldElement::from_hex("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"),
         FieldElement::from_hex("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"),
     );
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const PRIME_LE_WORDS: [u32; 8] = crate::risc0::SECP256R1_PRIME;
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const ORDER_LE_WORDS: [u32; 8] = crate::risc0::SECP256R1_ORDER;
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const EQUATION_A_LE: FieldElement256<NistP256> =
+        FieldElement256::new_unchecked(crate::risc0::SECP256R1_EQUATION_A_LE);
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const EQUATION_B_LE: FieldElement256<NistP256> =
+        FieldElement256::new_unchecked(crate::risc0::SECP256R1_EQUATION_B_LE);
 }

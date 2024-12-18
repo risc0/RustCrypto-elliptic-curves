@@ -163,6 +163,8 @@ use risc0_bigint2::ec;
 use elliptic_curve::{generic_array::GenericArray, PrimeField};
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+// TODO remove inline
+#[inline(never)]
 fn projective_to_affine<C>(p: &ProjectivePoint<C>) -> ec::AffinePoint<8, C>
 where
     C: PrimeCurveParams,
@@ -180,6 +182,8 @@ where
 }
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+// TODO remove inline
+#[inline(never)]
 fn affine_to_projective<C>(affine: &ec::AffinePoint<8, C>) -> ProjectivePoint<C>
 where
     C: PrimeCurveParams,
