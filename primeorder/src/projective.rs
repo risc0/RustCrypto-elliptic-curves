@@ -102,13 +102,8 @@ where
         Self: Double,
     {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-       {
-            let scalar = scalar_to_words::<C>(k);
-            let affine = projective_to_affine(self);
-
-            let mut result = ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
-            affine.mul(&scalar, &mut result);
-            return affine_to_projective(&result);
+        {
+            crate::risc0::ec_impl::mul(self, k)
         }
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         {
@@ -154,68 +149,6 @@ where
             q
         }
     }
-}
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-use risc0_bigint2::ec;
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-use elliptic_curve::{generic_array::GenericArray, PrimeField};
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-// TODO remove inline
-#[inline(never)]
-fn projective_to_affine<C>(p: &ProjectivePoint<C>) -> ec::AffinePoint<8, C>
-where
-    C: PrimeCurveParams,
-{
-    let aff = p.to_affine();
-    let x_bytes = aff.x.to_repr();
-    let y_bytes = aff.y.to_repr();
-    let mut x_bytes_arr: [u8; 32] = x_bytes.as_slice().try_into().unwrap();
-    let mut y_bytes_arr: [u8; 32] = y_bytes.as_slice().try_into().unwrap();
-    x_bytes_arr.reverse();
-    y_bytes_arr.reverse();
-    let x = bytemuck::cast::<_, [u32; 8]>(x_bytes_arr);
-    let y = bytemuck::cast::<_, [u32; 8]>(y_bytes_arr);
-    ec::AffinePoint::new_unchecked(x, y)
-}
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-// TODO remove inline
-#[inline(never)]
-fn affine_to_projective<C>(affine: &ec::AffinePoint<8, C>) -> ProjectivePoint<C>
-where
-    C: PrimeCurveParams,
-{
-    if let Some(value) = affine.as_u32s() {
-        // TODO a lot of potentially unnecessary copying here.
-        let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
-        let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
-        x.reverse();
-        y.reverse();
-        let x_arr = GenericArray::from_slice(&x);
-        let y_arr = GenericArray::from_slice(&y);
-        let affine = AffinePoint {
-            x: C::FieldElement::from_repr(x_arr.clone()).unwrap(),
-            y: C::FieldElement::from_repr(y_arr.clone()).unwrap(),
-            infinity: 0,
-        };
-        ProjectivePoint::from(affine)
-    } else {
-        ProjectivePoint::IDENTITY
-    }
-}
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-fn scalar_to_words<C>(s: &Scalar<C>) -> [u32; 8]
-where
-    C: PrimeCurveParams,
-{
-    let mut bytes: [u8; 32] = s.to_repr().as_slice().try_into().unwrap();
-    // U256 is big endian, need to flip to little endian.
-    bytes.reverse();
-    bytemuck::cast::<_, [u32; 8]>(bytes)
 }
 
 impl<C> CofactorGroup for ProjectivePoint<C>
@@ -406,6 +339,7 @@ where
     Self: Double,
     C: PrimeCurveParams,
 {
+    // TODO optimize impl for r0
 }
 
 impl<C> MulByGenerator for ProjectivePoint<C>

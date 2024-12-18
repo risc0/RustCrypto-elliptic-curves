@@ -466,6 +466,7 @@ where
     type Output = ProjectivePoint<C>;
 
     fn mul(self, scalar: S) -> ProjectivePoint<C> {
+        // TODO avoid proj conversion
         ProjectivePoint::<C>::from(self) * scalar
     }
 }

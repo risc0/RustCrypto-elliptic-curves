@@ -1,8 +1,11 @@
 use crate::FieldBytes;
+use crate::{affine::AffinePoint, projective::ProjectivePoint};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use elliptic_curve::generic_array::GenericArray;
 use elliptic_curve::subtle::{Choice, ConditionallySelectable};
+use elliptic_curve::{PrimeField, Scalar};
+use risc0_bigint2::ec;
 
 use crate::PrimeCurveParams;
 
@@ -169,5 +172,117 @@ where
     /// Returns self^2 mod p
     pub(crate) fn square(&self, result: &mut Self) {
         self.mul_unchecked(self, result);
+    }
+}
+
+// TODO remove inline
+#[inline(never)]
+pub(crate) fn projective_to_affine<C>(p: &ProjectivePoint<C>) -> ec::AffinePoint<8, C>
+where
+    C: PrimeCurveParams,
+{
+    let aff = p.to_affine();
+    let x_bytes = aff.x.to_repr();
+    let y_bytes = aff.y.to_repr();
+    let mut x_bytes_arr: [u8; 32] = x_bytes.as_slice().try_into().unwrap();
+    let mut y_bytes_arr: [u8; 32] = y_bytes.as_slice().try_into().unwrap();
+    x_bytes_arr.reverse();
+    y_bytes_arr.reverse();
+    let x = bytemuck::cast::<_, [u32; 8]>(x_bytes_arr);
+    let y = bytemuck::cast::<_, [u32; 8]>(y_bytes_arr);
+    ec::AffinePoint::new_unchecked(x, y)
+}
+
+// TODO remove inline
+#[inline(never)]
+pub(crate) fn affine_to_projective<C>(affine: &ec::AffinePoint<8, C>) -> ProjectivePoint<C>
+where
+    C: PrimeCurveParams,
+{
+    if let Some(value) = affine.as_u32s() {
+        // TODO a lot of potentially unnecessary copying here.
+        let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
+        let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
+        x.reverse();
+        y.reverse();
+        let x_arr = GenericArray::from_slice(&x);
+        let y_arr = GenericArray::from_slice(&y);
+        let affine = AffinePoint {
+            x: C::FieldElement::from_repr(x_arr.clone()).unwrap(),
+            y: C::FieldElement::from_repr(y_arr.clone()).unwrap(),
+            infinity: 0,
+        };
+        ProjectivePoint::from(affine)
+    } else {
+        ProjectivePoint::IDENTITY
+    }
+}
+
+#[inline(never)]
+pub(crate) fn scalar_to_words<C>(s: &Scalar<C>) -> [u32; 8]
+where
+    C: PrimeCurveParams,
+{
+    let mut bytes: [u8; 32] = s.to_repr().as_slice().try_into().unwrap();
+    // U256 is big endian, need to flip to little endian.
+    bytes.reverse();
+    bytemuck::cast::<_, [u32; 8]>(bytes)
+}
+
+pub(crate) mod ec_impl {
+    use super::*;
+
+    pub(crate) fn mul<C>(lhs: &ProjectivePoint<C>, rhs: &Scalar<C>) -> ProjectivePoint<C>
+    where
+        C: PrimeCurveParams,
+    {
+        let scalar = scalar_to_words::<C>(rhs);
+        let affine = projective_to_affine::<C>(lhs);
+
+        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+        affine.mul(&scalar, &mut result);
+        return affine_to_projective(&result);
+    }
+
+    pub(crate) fn add<C>(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C>
+    where
+        C: PrimeCurveParams,
+    {
+        let lhs = projective_to_affine::<C>(lhs);
+        let rhs = projective_to_affine::<C>(rhs);
+
+        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+        lhs.add(&rhs, &mut result);
+        return affine_to_projective(&result);
+    }
+
+    /// Implements complete mixed addition for curves with `a = -3`
+    ///
+    /// Implements the complete mixed addition formula from [Renes-Costello-Batina 2015]
+    /// (Algorithm 5). The comments after each line indicate which algorithm
+    /// steps are being performed.
+    ///
+    /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
+    pub(crate) fn add_mixed<C>(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C>
+    where
+        C: PrimeCurveParams,
+    {
+        // TODO
+        todo!()
+    }
+
+    /// Implements point doubling for curves with `a = -3`
+    ///
+    /// Implements the exception-free point doubling formula from [Renes-Costello-Batina 2015]
+    /// (Algorithm 6). The comments after each line indicate which algorithm
+    /// steps are being performed.
+    ///
+    /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
+    pub(crate) fn double<C>(point: &ProjectivePoint<C>) -> ProjectivePoint<C>
+    where
+        C: PrimeCurveParams,
+    {
+        // TODO
+        todo!()
     }
 }
