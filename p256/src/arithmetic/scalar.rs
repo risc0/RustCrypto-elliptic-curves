@@ -135,17 +135,23 @@ impl Scalar {
         {
             use crate::elliptic_curve::bigint::Encoding;
 
-            let input = self.0.to_le_bytes();
-            let input_words = bytemuck::cast::<_, [u32; 8]>(input);
-            let mut output = [0u32; 8];
-            risc0_bigint2::field::modinv_256_unchecked(
-                &input_words,
-                &crate::risc0::SECP256R1_ORDER,
-                &mut output,
-            );
-            let bytes = bytemuck::cast_slice::<u32, u8>(&output);
-            let res = Scalar(U256::from_le_slice(bytes));
-            CtOption::new(res, !res.is_zero())
+            // NOTE: This is not a constant time operation, as inverting zero in the zkvm is not
+            // possible as it will panic in the host.
+            if self.is_zero().into() {
+                return CtOption::new(Scalar::ZERO, Choice::from(0));
+            } else {
+                let input = self.0.to_le_bytes();
+                let input_words = bytemuck::cast::<_, [u32; 8]>(input);
+                let mut output = [0u32; 8];
+                risc0_bigint2::field::modinv_256_unchecked(
+                    &input_words,
+                    &crate::risc0::SECP256R1_ORDER,
+                    &mut output,
+                );
+                let bytes = bytemuck::cast_slice::<u32, u8>(&output);
+                let res = Scalar(U256::from_le_slice(bytes));
+                CtOption::new(res, Choice::from(1))
+            }
         }
 
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]

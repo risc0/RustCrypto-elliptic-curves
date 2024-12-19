@@ -96,14 +96,20 @@ impl FieldElement {
         {
             use crate::elliptic_curve::bigint::Encoding;
 
-            let input_words = self.to_words_le();
-            let mut output = [0u32; 8];
-            risc0_bigint2::field::modinv_256_unchecked(
-                &input_words,
-                &crate::risc0::SECP256R1_PRIME,
-                &mut output,
-            );
-            FieldElement::from_words_le(output)
+            // NOTE: This is not a constant time operation, as inverting zero in the zkvm is not
+            // possible as it will panic in the host.
+            if self.is_zero().into() {
+                return CtOption::new(FieldElement::ZERO, Choice::from(0));
+            } else {
+                let input_words = self.to_words_le();
+                let mut output = [0u32; 8];
+                risc0_bigint2::field::modinv_256_unchecked(
+                    &input_words,
+                    &crate::risc0::SECP256R1_PRIME,
+                    &mut output,
+                );
+                FieldElement::from_words_le(output)
+            }
         }
 
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]

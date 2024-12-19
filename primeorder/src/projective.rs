@@ -60,6 +60,9 @@ where
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
             use crate::risc0::felt_to_u32_words_le;
+            if self.z.is_zero().into() {
+                return AffinePoint::IDENTITY;
+            }
             let z = felt_to_u32_words_le::<C>(&self.z);
             let mut z_inv = [0u32; 8];
             risc0_bigint2::field::modinv_256_unchecked(&z, &C::PRIME_LE_WORDS, &mut z_inv);
