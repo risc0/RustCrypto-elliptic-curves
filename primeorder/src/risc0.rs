@@ -185,14 +185,22 @@ where
     bytemuck::cast::<_, [u32; 8]>(data_bytes)
 }
 
+#[inline]
+fn affine_to_r0_affine<C>(affine: &AffinePoint<C>) -> ec::AffinePoint<8, C>
+where
+    C: PrimeCurveParams,
+{
+    let x = felt_to_u32_words_le::<C>(&affine.x);
+    let y = felt_to_u32_words_le::<C>(&affine.y);
+    ec::AffinePoint::new_unchecked(x, y)
+}
+
 pub(crate) fn projective_to_affine<C>(p: &ProjectivePoint<C>) -> ec::AffinePoint<8, C>
 where
     C: PrimeCurveParams,
 {
     let aff = p.to_affine();
-    let x = felt_to_u32_words_le::<C>(&aff.x);
-    let y = felt_to_u32_words_le::<C>(&aff.y);
-    ec::AffinePoint::new_unchecked(x, y)
+    affine_to_r0_affine(&aff)
 }
 
 pub(crate) fn affine_to_projective<C>(affine: &ec::AffinePoint<8, C>) -> ProjectivePoint<C>
@@ -260,12 +268,17 @@ pub(crate) mod ec_impl {
     /// steps are being performed.
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
+    #[inline]
     pub(crate) fn add_mixed<C>(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C>
     where
         C: PrimeCurveParams,
     {
-        // TODO
-        todo!()
+        let lhs = projective_to_affine::<C>(lhs);
+        let rhs = affine_to_r0_affine(rhs);
+
+        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+        lhs.add(&rhs, &mut result);
+        return affine_to_projective(&result);
     }
 
     /// Implements point doubling for curves with `a = -3`
@@ -279,7 +292,10 @@ pub(crate) mod ec_impl {
     where
         C: PrimeCurveParams,
     {
-        // TODO
-        todo!()
+        let point = projective_to_affine::<C>(point);
+
+        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; 8], [0u32; 8]);
+        point.double(&mut result);
+        return affine_to_projective(&result);
     }
 }
