@@ -1,7 +1,6 @@
 //! ECDSA tests.
 
-#![cfg(feature = "arithmetic")]
-
+#![cfg(all(feature = "arithmetic", not(all(target_os = "zkvm", target_arch = "riscv32"))))]
 use elliptic_curve::ops::Reduce;
 use p256::{
     ecdsa::{SigningKey, VerifyingKey},

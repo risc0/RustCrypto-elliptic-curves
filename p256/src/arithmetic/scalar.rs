@@ -131,6 +131,30 @@ impl Scalar {
 
     /// Returns the multiplicative inverse of self, if self is non-zero
     pub fn invert(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::elliptic_curve::bigint::Encoding;
+
+            // NOTE: This is not a constant time operation, as inverting zero in the zkvm is not
+            // possible as it will panic in the host.
+            if self.is_zero().into() {
+                return CtOption::new(Scalar::ZERO, Choice::from(0));
+            } else {
+                let input = self.0.to_le_bytes();
+                let input_words = bytemuck::cast::<_, [u32; 8]>(input);
+                let mut output = [0u32; 8];
+                risc0_bigint2::field::modinv_256_unchecked(
+                    &input_words,
+                    &crate::__risc0::SECP256R1_ORDER,
+                    &mut output,
+                );
+                let bytes = bytemuck::cast_slice::<u32, u8>(&output);
+                let res = Scalar(U256::from_le_slice(bytes));
+                CtOption::new(res, Choice::from(1))
+            }
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         CtOption::new(self.invert_unchecked(), !self.is_zero())
     }
 
@@ -363,6 +387,11 @@ impl Invert for Scalar {
     /// sidechannels.
     #[allow(non_snake_case)]
     fn invert_vartime(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return self.invert();
+        }
+
         let mut u = *self;
         let mut v = Self(MODULUS);
         let mut A = Self::ONE;

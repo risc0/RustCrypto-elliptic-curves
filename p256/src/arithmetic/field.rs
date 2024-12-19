@@ -30,6 +30,14 @@ pub const MODULUS: U256 = U256::from_be_hex(MODULUS_HEX);
 const R_2: U256 =
     U256::from_be_hex("00000004fffffffdfffffffffffffffefffffffbffffffff0000000000000003");
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use primeorder::__risc0::FieldElement256;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+const R_2_LE: FieldElement256<NistP256> = FieldElement256::new_unchecked([
+    0x00000001, 0x00000000, 0x00000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE, 0x00000000,
+]);
+
 /// An element in the finite field modulo p = 2^{224}(2^{32} − 1) + 2^{192} + 2^{96} − 1.
 ///
 /// The internal representation is in little-endian order. Elements are always in
@@ -54,8 +62,57 @@ primeorder::impl_mont_field_element!(
 );
 
 impl FieldElement {
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn from_words_le(fe: [u32; 8]) -> CtOption<Self> {
+        let fe = FieldElement256::new_unchecked(fe);
+
+        // Convert to montgomery form with aR mod p
+        let mut mont = FieldElement256::default();
+        fe.mul_unchecked(&R_2_LE, &mut mont);
+
+        let buffer: [u32; 8] = mont.data;
+
+        use crate::elliptic_curve::subtle::ConstantTimeLess as _;
+        let uint = U256::from_le_slice(bytemuck::cast_slice::<u32, u8>(&buffer));
+        let is_within_modulus = uint.ct_lt(&MODULUS);
+
+        CtOption::new(Self(uint), is_within_modulus)
+    }
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn to_words_le(&self) -> [u32; 8] {
+        use crate::elliptic_curve::bigint::Encoding;
+        // NOTE: this from mont conversion could be accelerated, but it's very little cycles.
+        let canonical = self.to_canonical();
+        let input = canonical.to_le_bytes();
+        let array = bytemuck::cast::<_, [u32; 8]>(input);
+
+        array
+    }
+
     /// Returns the multiplicative inverse of self, if self is non-zero.
     pub fn invert(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::elliptic_curve::bigint::Encoding;
+
+            // NOTE: This is not a constant time operation, as inverting zero in the zkvm is not
+            // possible as it will panic in the host.
+            if self.is_zero().into() {
+                return CtOption::new(FieldElement::ZERO, Choice::from(0));
+            } else {
+                let input_words = self.to_words_le();
+                let mut output = [0u32; 8];
+                risc0_bigint2::field::modinv_256_unchecked(
+                    &input_words,
+                    &crate::__risc0::SECP256R1_PRIME,
+                    &mut output,
+                );
+                FieldElement::from_words_le(output)
+            }
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         CtOption::new(self.invert_unchecked(), !self.is_zero())
     }
 
@@ -63,6 +120,9 @@ impl FieldElement {
     ///
     /// Does not check that self is non-zero.
     const fn invert_unchecked(&self) -> Self {
+        // NOTE: It is fine that the internal invert function is not overriden for the zkvm, as this
+        // is only called in compile time constants given `invert` is overridden.
+
         // We need to find b such that b * a ≡ 1 mod p. As we are in a prime
         // field, we can apply Fermat's Little Theorem:
         //
@@ -169,6 +229,7 @@ mod tests {
         impl_field_identity_tests, impl_field_invert_tests, impl_field_sqrt_tests,
         impl_primefield_tests,
     };
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     use proptest::{num, prelude::*};
 
     /// t = (modulus - 1) >> S
@@ -263,6 +324,7 @@ mod tests {
         assert_eq!(two.pow_vartime(&[2, 0, 0, 0]), four);
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     proptest! {
         /// This checks behaviour well within the field ranges, because it doesn't set the
         /// highest limb.
