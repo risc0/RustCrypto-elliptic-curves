@@ -227,11 +227,16 @@ pub(crate) fn scalar_to_words<C>(s: &Scalar<C>) -> [u32; 8]
 where
     C: PrimeCurveParams,
 {
-    // TODO alignment
-    let mut bytes: [u8; 32] = s.to_repr().as_slice().try_into().unwrap();
-    // U256 is big endian, need to flip to little endian.
-    bytes.reverse();
-    bytemuck::cast::<_, [u32; 8]>(bytes)
+    let mut words = [0u32; 8];
+    let bytes = s.to_repr();
+
+    // Process 4 bytes at a time to create little-endian u32 words
+    for (i, chunk) in bytes.as_slice().chunks(4).enumerate() {
+        // Convert each big-endian chunk to a little-endian u32
+        words[7 - i] = u32::from_be_bytes(chunk.try_into().unwrap());
+    }
+
+    words
 }
 
 pub(crate) mod ec_impl {
