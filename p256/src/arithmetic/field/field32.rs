@@ -9,7 +9,6 @@ use crate::arithmetic::util::{adc, mac, sbb};
 pub type Fe = [u32; 8];
 
 /// Translate a field element out of the Montgomery domain.
-#[inline]
 pub const fn fe_from_montgomery(w: &Fe) -> Fe {
     let w = fe32_to_fe64(w);
     montgomery_reduce(&[w[0], w[1], w[2], w[3], 0, 0, 0, 0])

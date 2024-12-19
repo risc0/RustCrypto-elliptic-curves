@@ -456,7 +456,6 @@ macro_rules! impl_field_op {
         impl ::core::ops::$op for $fe {
             type Output = $fe;
 
-            #[inline]
             fn $op_fn(self, rhs: $fe) -> $fe {
                 $fe($func(self.as_ref(), rhs.as_ref()).into())
             }
@@ -465,7 +464,6 @@ macro_rules! impl_field_op {
         impl ::core::ops::$op<&$fe> for $fe {
             type Output = $fe;
 
-            #[inline]
             fn $op_fn(self, rhs: &$fe) -> $fe {
                 $fe($func(self.as_ref(), rhs.as_ref()).into())
             }
@@ -474,7 +472,6 @@ macro_rules! impl_field_op {
         impl ::core::ops::$op<&$fe> for &$fe {
             type Output = $fe;
 
-            #[inline]
             fn $op_fn(self, rhs: &$fe) -> $fe {
                 $fe($func(self.as_ref(), rhs.as_ref()).into())
             }

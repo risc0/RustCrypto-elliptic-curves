@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
 #![doc(
@@ -28,6 +28,10 @@
 
 #[cfg(feature = "arithmetic")]
 mod arithmetic;
+
+// TODO put behind cfg
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+mod risc0;
 
 #[cfg(feature = "ecdh")]
 pub mod ecdh;

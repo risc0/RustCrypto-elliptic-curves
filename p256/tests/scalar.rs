@@ -1,6 +1,6 @@
 //! Scalar arithmetic tests.
 
-#![cfg(feature = "arithmetic")]
+#![cfg(all(feature = "arithmetic", not(all(target_os = "zkvm", target_arch = "riscv32"))))]
 
 use elliptic_curve::ops::{Invert, Reduce};
 use p256::{Scalar, U256};

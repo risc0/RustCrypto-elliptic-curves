@@ -1,5 +1,7 @@
 //! secp256r1 scalar arithmetic benchmarks
 
+#![cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+
 use criterion::{
     criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
 };
