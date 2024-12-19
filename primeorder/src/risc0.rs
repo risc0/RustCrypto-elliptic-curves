@@ -175,27 +175,26 @@ where
     }
 }
 
-// TODO remove inline
-#[inline(never)]
+pub(crate) fn felt_to_u32_words_le<C>(data: &C::FieldElement) -> [u32; 8]
+where
+    C: PrimeCurveParams,
+{
+    // TODO alignment
+    let mut data_bytes: [u8; 32] = data.to_repr().as_slice().try_into().unwrap();
+    data_bytes.reverse();
+    bytemuck::cast::<_, [u32; 8]>(data_bytes)
+}
+
 pub(crate) fn projective_to_affine<C>(p: &ProjectivePoint<C>) -> ec::AffinePoint<8, C>
 where
     C: PrimeCurveParams,
 {
     let aff = p.to_affine();
-    let x_bytes = aff.x.to_repr();
-    let y_bytes = aff.y.to_repr();
-    let mut x_bytes_arr: [u8; 32] = x_bytes.as_slice().try_into().unwrap();
-    let mut y_bytes_arr: [u8; 32] = y_bytes.as_slice().try_into().unwrap();
-    x_bytes_arr.reverse();
-    y_bytes_arr.reverse();
-    // TODO make more alignment safe
-    let x = bytemuck::cast::<_, [u32; 8]>(x_bytes_arr);
-    let y = bytemuck::cast::<_, [u32; 8]>(y_bytes_arr);
+    let x = felt_to_u32_words_le::<C>(&aff.x);
+    let y = felt_to_u32_words_le::<C>(&aff.y);
     ec::AffinePoint::new_unchecked(x, y)
 }
 
-// TODO remove inline
-#[inline(never)]
 pub(crate) fn affine_to_projective<C>(affine: &ec::AffinePoint<8, C>) -> ProjectivePoint<C>
 where
     C: PrimeCurveParams,
@@ -216,11 +215,11 @@ where
     }
 }
 
-#[inline(never)]
 pub(crate) fn scalar_to_words<C>(s: &Scalar<C>) -> [u32; 8]
 where
     C: PrimeCurveParams,
 {
+    // TODO alignment
     let mut bytes: [u8; 32] = s.to_repr().as_slice().try_into().unwrap();
     // U256 is big endian, need to flip to little endian.
     bytes.reverse();

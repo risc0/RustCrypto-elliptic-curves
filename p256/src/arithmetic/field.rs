@@ -63,12 +63,10 @@ primeorder::impl_mont_field_element!(
 
 impl FieldElement {
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-    #[inline(never)]
     pub(crate) fn from_words_le(fe: [u32; 8]) -> CtOption<Self> {
-        // use elliptic_curve::bigint::Encoding;
-        // println!("r2: {:0X?}", fe_from_montgomery(R_2.as_words()));
-
         let fe = FieldElement256::new_unchecked(fe);
+
+        // Convert to montgomery form with aR mod p
         let mut mont = FieldElement256::default();
         fe.mul_unchecked(&R_2_LE, &mut mont);
 
@@ -81,16 +79,24 @@ impl FieldElement {
         CtOption::new(Self(uint), is_within_modulus)
     }
 
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn to_words_le(&self) -> [u32; 8] {
+        use crate::elliptic_curve::bigint::Encoding;
+        // NOTE: this from mont conversion could be accelerated, but it's very little cycles.
+        let canonical = self.to_canonical();
+        let input = canonical.to_le_bytes();
+        let array = bytemuck::cast::<_, [u32; 8]>(input);
+
+        array
+    }
+
     /// Returns the multiplicative inverse of self, if self is non-zero.
-    #[inline(never)]
     pub fn invert(&self) -> CtOption<Self> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
             use crate::elliptic_curve::bigint::Encoding;
 
-            let canonical = self.to_canonical();
-            let input = canonical.to_le_bytes();
-            let input_words = bytemuck::cast::<_, [u32; 8]>(input);
+            let input_words = self.to_words_le();
             let mut output = [0u32; 8];
             risc0_bigint2::field::modinv_256_unchecked(
                 &input_words,

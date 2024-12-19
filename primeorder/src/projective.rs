@@ -57,6 +57,37 @@ where
 
     /// Returns the affine representation of this point, or `None` if it is the identity.
     pub fn to_affine(&self) -> AffinePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::risc0::felt_to_u32_words_le;
+            let z = felt_to_u32_words_le::<C>(&self.z);
+            let mut z_inv = [0u32; 8];
+            risc0_bigint2::field::modinv_256_unchecked(&z, &C::PRIME_LE_WORDS, &mut z_inv);
+
+            let mut buffer = [0u32; 8];
+            let x_buffer = felt_to_u32_words_le::<C>(&self.x);
+            let y_buffer = felt_to_u32_words_le::<C>(&self.y);
+            risc0_bigint2::field::modmul_256_unchecked(
+                &x_buffer,
+                &z_inv,
+                &C::PRIME_LE_WORDS,
+                &mut buffer,
+            );
+
+            let x = C::from_u32_words_le(buffer);
+
+            risc0_bigint2::field::modmul_256_unchecked(
+                &y_buffer,
+                &z_inv,
+                &C::PRIME_LE_WORDS,
+                &mut buffer,
+            );
+            let y = C::from_u32_words_le(buffer);
+            return x
+                .and_then(|x| y.map(|y| AffinePoint { x, y, infinity: 0 }))
+                .unwrap_or(AffinePoint::IDENTITY);
+        }
+
         self.z
             .invert()
             .map(|zinv| AffinePoint {
