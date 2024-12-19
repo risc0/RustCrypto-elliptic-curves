@@ -2,6 +2,7 @@ use crate::FieldBytes;
 use crate::{affine::AffinePoint, projective::ProjectivePoint};
 use core::marker::PhantomData;
 use core::ops::Deref;
+use elliptic_curve::consts::U32;
 use elliptic_curve::generic_array::GenericArray;
 use elliptic_curve::subtle::{Choice, ConditionallySelectable};
 use elliptic_curve::{PrimeField, Scalar};
@@ -175,14 +176,23 @@ where
     }
 }
 
+fn bytes_to_u32_words_le(bytes: &[u8]) -> [u32; 8] {
+    let mut words = [0u32; 8];
+
+    // Process 4 bytes at a time to create little-endian u32 words
+    for (i, chunk) in bytes.chunks(4).enumerate() {
+        // Convert each big-endian chunk to a little-endian u32
+        words[7 - i] = u32::from_be_bytes(chunk.try_into().unwrap());
+    }
+
+    words
+}
+
 pub(crate) fn felt_to_u32_words_le<C>(data: &C::FieldElement) -> [u32; 8]
 where
     C: PrimeCurveParams,
 {
-    // TODO alignment
-    let mut data_bytes: [u8; 32] = data.to_repr().as_slice().try_into().unwrap();
-    data_bytes.reverse();
-    bytemuck::cast::<_, [u32; 8]>(data_bytes)
+    bytes_to_u32_words_le(data.to_repr().as_slice())
 }
 
 #[inline]
@@ -227,16 +237,7 @@ pub(crate) fn scalar_to_words<C>(s: &Scalar<C>) -> [u32; 8]
 where
     C: PrimeCurveParams,
 {
-    let mut words = [0u32; 8];
-    let bytes = s.to_repr();
-
-    // Process 4 bytes at a time to create little-endian u32 words
-    for (i, chunk) in bytes.as_slice().chunks(4).enumerate() {
-        // Convert each big-endian chunk to a little-endian u32
-        words[7 - i] = u32::from_be_bytes(chunk.try_into().unwrap());
-    }
-
-    words
+    bytes_to_u32_words_le(s.to_repr().as_slice())
 }
 
 pub(crate) mod ec_impl {
