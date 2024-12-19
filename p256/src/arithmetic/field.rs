@@ -30,6 +30,14 @@ pub const MODULUS: U256 = U256::from_be_hex(MODULUS_HEX);
 const R_2: U256 =
     U256::from_be_hex("00000004fffffffdfffffffffffffffefffffffbffffffff0000000000000003");
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use primeorder::risc0::FieldElement256;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+const R_2_LE: FieldElement256<NistP256> = FieldElement256::new_unchecked([
+    0x00000001, 0x00000000, 0x00000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE, 0x00000000,
+]);
+
 /// An element in the finite field modulo p = 2^{224}(2^{32} − 1) + 2^{192} + 2^{96} − 1.
 ///
 /// The internal representation is in little-endian order. Elements are always in
@@ -54,6 +62,25 @@ primeorder::impl_mont_field_element!(
 );
 
 impl FieldElement {
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    #[inline(never)]
+    pub(crate) fn from_words_le(fe: [u32; 8]) -> CtOption<Self> {
+        // use elliptic_curve::bigint::Encoding;
+        // println!("r2: {:0X?}", fe_from_montgomery(R_2.as_words()));
+
+        let fe = FieldElement256::new_unchecked(fe);
+        let mut mont = FieldElement256::default();
+        fe.mul_unchecked(&R_2_LE, &mut mont);
+
+        let buffer: [u32; 8] = mont.data;
+
+        use crate::elliptic_curve::subtle::ConstantTimeLess as _;
+        let uint = U256::from_le_slice(bytemuck::cast_slice::<u32, u8>(&buffer));
+        let is_within_modulus = uint.ct_lt(&MODULUS);
+
+        CtOption::new(Self(uint), is_within_modulus)
+    }
+
     /// Returns the multiplicative inverse of self, if self is non-zero.
     #[inline(never)]
     pub fn invert(&self) -> CtOption<Self> {
@@ -70,8 +97,7 @@ impl FieldElement {
                 &crate::risc0::SECP256R1_PRIME,
                 &mut output,
             );
-            let bytes = bytemuck::cast_slice::<u32, u8>(&output);
-            FieldElement::from_uint(U256::from_le_slice(bytes))
+            FieldElement::from_words_le(output)
         }
 
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
@@ -114,8 +140,6 @@ impl FieldElement {
         //     alpha = ± beta^((p + 1) / 4) mod p
         //
         // Thus sqrt can be implemented with a single exponentiation.
-        
-        // TODO apply acceleration
 
         let t11 = self.mul(&self.square());
         let t1111 = t11.mul(&t11.sqn(2));

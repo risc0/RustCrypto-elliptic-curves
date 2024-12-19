@@ -73,4 +73,9 @@ impl PrimeCurveParams for NistP256 {
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
     const EQUATION_B_LE: FieldElement256<NistP256> =
         FieldElement256::new_unchecked(crate::risc0::SECP256R1_EQUATION_B_LE);
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn from_u32_words_le(words: [u32; 8]) -> elliptic_curve::subtle::CtOption<FieldElement> {
+        FieldElement::from_words_le(words)
+    }
 }

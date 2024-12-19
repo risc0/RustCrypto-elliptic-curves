@@ -92,4 +92,6 @@ pub trait PrimeCurveParams:
     /// Coefficient `b` in the curve equation in little-endian words to be compatible with risc0
     /// expected layout.
     const EQUATION_B_LE: risc0::FieldElement256<Self>;
+
+    fn from_u32_words_le(words: [u32; 8]) -> elliptic_curve::subtle::CtOption<Self::FieldElement>;
 }

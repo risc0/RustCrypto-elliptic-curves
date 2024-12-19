@@ -12,7 +12,7 @@ use crate::PrimeCurveParams;
 /// Representation of a field element in raw bytes form. This is not in montgomery form.
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub struct FieldElement256<C> {
-    pub(crate) data: [u32; 8],
+    pub data: [u32; 8],
     _phantom: PhantomData<C>,
 }
 
@@ -73,7 +73,7 @@ impl<C> FieldElement256<C>
 where
     C: PrimeCurveParams,
 {
-    pub(crate) fn mul_unchecked(&self, rhs: &Self, result: &mut Self) {
+    pub fn mul_unchecked(&self, rhs: &Self, result: &mut Self) {
         risc0_bigint2::field::modmul_256_unchecked(
             &self.data,
             &rhs.data,
@@ -82,7 +82,7 @@ where
         );
     }
 
-    pub(crate) fn add_unchecked(&self, rhs: &Self, result: &mut Self) {
+    pub fn add_unchecked(&self, rhs: &Self, result: &mut Self) {
         risc0_bigint2::field::modadd_256_unchecked(
             &self.data,
             &rhs.data,
@@ -188,6 +188,7 @@ where
     let mut y_bytes_arr: [u8; 32] = y_bytes.as_slice().try_into().unwrap();
     x_bytes_arr.reverse();
     y_bytes_arr.reverse();
+    // TODO make more alignment safe
     let x = bytemuck::cast::<_, [u32; 8]>(x_bytes_arr);
     let y = bytemuck::cast::<_, [u32; 8]>(y_bytes_arr);
     ec::AffinePoint::new_unchecked(x, y)
@@ -200,19 +201,16 @@ where
     C: PrimeCurveParams,
 {
     if let Some(value) = affine.as_u32s() {
-        // TODO a lot of potentially unnecessary copying here.
-        let mut x = bytemuck::cast::<_, [u8; 32]>(value[0]);
-        let mut y = bytemuck::cast::<_, [u8; 32]>(value[1]);
-        x.reverse();
-        y.reverse();
-        let x_arr = GenericArray::from_slice(&x);
-        let y_arr = GenericArray::from_slice(&y);
-        let affine = AffinePoint {
-            x: C::FieldElement::from_repr(x_arr.clone()).unwrap(),
-            y: C::FieldElement::from_repr(y_arr.clone()).unwrap(),
-            infinity: 0,
-        };
-        ProjectivePoint::from(affine)
+        let x = C::from_u32_words_le(value[0]);
+        let y = C::from_u32_words_le(value[1]);
+
+        x.and_then(|x| {
+            y.map(|y| {
+                let affine = AffinePoint { x, y, infinity: 0 };
+                ProjectivePoint::from(affine)
+            })
+        })
+        .unwrap_or(ProjectivePoint::IDENTITY)
     } else {
         ProjectivePoint::IDENTITY
     }
