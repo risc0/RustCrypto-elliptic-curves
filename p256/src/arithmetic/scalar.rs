@@ -389,55 +389,52 @@ impl Invert for Scalar {
     fn invert_vartime(&self) -> CtOption<Self> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            self.invert()
+            return self.invert();
         }
 
-        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
-        {
-            let mut u = *self;
-            let mut v = Self(MODULUS);
-            let mut A = Self::ONE;
-            let mut C = Self::ZERO;
+        let mut u = *self;
+        let mut v = Self(MODULUS);
+        let mut A = Self::ONE;
+        let mut C = Self::ZERO;
 
-            while !bool::from(u.is_zero()) {
-                // u-loop
-                while bool::from(u.is_even()) {
-                    u >>= 1;
+        while !bool::from(u.is_zero()) {
+            // u-loop
+            while bool::from(u.is_even()) {
+                u >>= 1;
 
-                    let was_odd: bool = A.is_odd().into();
-                    A >>= 1;
+                let was_odd: bool = A.is_odd().into();
+                A >>= 1;
 
-                    if was_odd {
-                        A += FRAC_MODULUS_2;
-                        A += Self::ONE;
-                    }
-                }
-
-                // v-loop
-                while bool::from(v.is_even()) {
-                    v >>= 1;
-
-                    let was_odd: bool = C.is_odd().into();
-                    C >>= 1;
-
-                    if was_odd {
-                        C += FRAC_MODULUS_2;
-                        C += Self::ONE;
-                    }
-                }
-
-                // sub-step
-                if u >= v {
-                    u -= &v;
-                    A -= &C;
-                } else {
-                    v -= &u;
-                    C -= &A;
+                if was_odd {
+                    A += FRAC_MODULUS_2;
+                    A += Self::ONE;
                 }
             }
 
-            CtOption::new(C, !self.is_zero())
+            // v-loop
+            while bool::from(v.is_even()) {
+                v >>= 1;
+
+                let was_odd: bool = C.is_odd().into();
+                C >>= 1;
+
+                if was_odd {
+                    C += FRAC_MODULUS_2;
+                    C += Self::ONE;
+                }
+            }
+
+            // sub-step
+            if u >= v {
+                u -= &v;
+                A -= &C;
+            } else {
+                v -= &u;
+                C -= &A;
+            }
         }
+
+        CtOption::new(C, !self.is_zero())
     }
 }
 
