@@ -145,7 +145,7 @@ impl Scalar {
                 let mut output = [0u32; 8];
                 risc0_bigint2::field::modinv_256_unchecked(
                     &input_words,
-                    &crate::risc0::SECP256R1_ORDER,
+                    &crate::__risc0::SECP256R1_ORDER,
                     &mut output,
                 );
                 let bytes = bytemuck::cast_slice::<u32, u8>(&output);

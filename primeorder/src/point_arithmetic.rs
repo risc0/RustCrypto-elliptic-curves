@@ -44,7 +44,7 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            return crate::risc0::ec_impl::add(lhs, rhs);
+            return crate::__risc0::ec_impl::add(lhs, rhs);
         }
         let b3 = C::FieldElement::from(3) * C::EQUATION_B;
 
@@ -106,7 +106,7 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            return crate::risc0::ec_impl::add_mixed(lhs, rhs);
+            return crate::__risc0::ec_impl::add_mixed(lhs, rhs);
         }
         let b3 = C::EQUATION_B * C::FieldElement::from(3);
 
@@ -163,7 +163,7 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            return crate::risc0::ec_impl::double(point);
+            return crate::__risc0::ec_impl::double(point);
         }
         let b3 = C::EQUATION_B * C::FieldElement::from(3);
 
@@ -221,7 +221,7 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            return crate::risc0::ec_impl::add(lhs, rhs);
+            return crate::__risc0::ec_impl::add(lhs, rhs);
         }
         debug_assert_eq!(
             C::EQUATION_A,
@@ -263,7 +263,7 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            return crate::risc0::ec_impl::add_mixed(lhs, rhs);
+            return crate::__risc0::ec_impl::add_mixed(lhs, rhs);
         }
         debug_assert_eq!(
             C::EQUATION_A,
@@ -306,7 +306,7 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            return crate::risc0::ec_impl::double(point);
+            return crate::__risc0::ec_impl::double(point);
         }
         debug_assert_eq!(
             C::EQUATION_A,

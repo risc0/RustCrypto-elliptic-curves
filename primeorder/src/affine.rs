@@ -133,7 +133,7 @@ where
     fn decompress(x_bytes: &FieldBytes<C>, y_is_odd: Choice) -> CtOption<Self> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            use crate::risc0::FieldElement256;
+            use crate::__risc0::FieldElement256;
 
             // Note: buffers are kept separate for each OP as the result pointer cannot equal one
             // of the input pointers.

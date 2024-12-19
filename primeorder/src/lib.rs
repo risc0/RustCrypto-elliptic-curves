@@ -16,8 +16,10 @@ mod dev;
 mod field;
 mod projective;
 
+/// WARNING: This is not part of the public API of the crate, and will not follow semver guarantees.
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-pub mod risc0;
+#[path = "risc0.rs"]
+pub mod __risc0;
 
 pub use crate::{affine::AffinePoint, projective::ProjectivePoint};
 pub use elliptic_curve::{self, point::Double, Field, FieldBytes, PrimeCurve, PrimeField};
@@ -87,11 +89,11 @@ pub trait PrimeCurveParams:
 
     /// Coefficient `a` in the curve equation in little-endian words to be compatible with risc0
     /// expected layout.
-    const EQUATION_A_LE: risc0::FieldElement256<Self>;
+    const EQUATION_A_LE: __risc0::FieldElement256<Self>;
 
     /// Coefficient `b` in the curve equation in little-endian words to be compatible with risc0
     /// expected layout.
-    const EQUATION_B_LE: risc0::FieldElement256<Self>;
+    const EQUATION_B_LE: __risc0::FieldElement256<Self>;
 
     fn from_u32_words_le(words: [u32; 8]) -> elliptic_curve::subtle::CtOption<Self::FieldElement>;
 }

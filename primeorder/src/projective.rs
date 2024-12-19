@@ -59,7 +59,7 @@ where
     pub fn to_affine(&self) -> AffinePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            use crate::risc0::felt_to_u32_words_le;
+            use crate::__risc0::felt_to_u32_words_le;
             if self.z.is_zero().into() {
                 return AffinePoint::IDENTITY;
             }
@@ -137,7 +137,7 @@ where
     {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            crate::risc0::ec_impl::mul(self, k)
+            crate::__risc0::ec_impl::mul(self, k)
         }
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         {

@@ -29,9 +29,9 @@
 #[cfg(feature = "arithmetic")]
 mod arithmetic;
 
-// TODO put behind cfg
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-mod risc0;
+#[path = "risc0.rs"]
+mod __risc0;
 
 #[cfg(feature = "ecdh")]
 pub mod ecdh;

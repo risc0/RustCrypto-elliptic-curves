@@ -32,7 +32,7 @@ impl PrimeCurveArithmetic for NistP256 {
 }
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-use primeorder::risc0::FieldElement256;
+use primeorder::__risc0::FieldElement256;
 
 /// Adapted from [NIST SP 800-186] § G.1.2: Curve P-256.
 ///
@@ -61,18 +61,18 @@ impl PrimeCurveParams for NistP256 {
     );
 
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-    const PRIME_LE_WORDS: [u32; 8] = crate::risc0::SECP256R1_PRIME;
+    const PRIME_LE_WORDS: [u32; 8] = crate::__risc0::SECP256R1_PRIME;
 
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-    const ORDER_LE_WORDS: [u32; 8] = crate::risc0::SECP256R1_ORDER;
+    const ORDER_LE_WORDS: [u32; 8] = crate::__risc0::SECP256R1_ORDER;
 
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
     const EQUATION_A_LE: FieldElement256<NistP256> =
-        FieldElement256::new_unchecked(crate::risc0::SECP256R1_EQUATION_A_LE);
+        FieldElement256::new_unchecked(crate::__risc0::SECP256R1_EQUATION_A_LE);
 
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
     const EQUATION_B_LE: FieldElement256<NistP256> =
-        FieldElement256::new_unchecked(crate::risc0::SECP256R1_EQUATION_B_LE);
+        FieldElement256::new_unchecked(crate::__risc0::SECP256R1_EQUATION_B_LE);
 
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
     fn from_u32_words_le(words: [u32; 8]) -> elliptic_curve::subtle::CtOption<FieldElement> {

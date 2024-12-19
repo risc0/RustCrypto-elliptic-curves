@@ -31,7 +31,7 @@ const R_2: U256 =
     U256::from_be_hex("00000004fffffffdfffffffffffffffefffffffbffffffff0000000000000003");
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-use primeorder::risc0::FieldElement256;
+use primeorder::__risc0::FieldElement256;
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
 const R_2_LE: FieldElement256<NistP256> = FieldElement256::new_unchecked([
@@ -105,7 +105,7 @@ impl FieldElement {
                 let mut output = [0u32; 8];
                 risc0_bigint2::field::modinv_256_unchecked(
                     &input_words,
-                    &crate::risc0::SECP256R1_PRIME,
+                    &crate::__risc0::SECP256R1_PRIME,
                     &mut output,
                 );
                 FieldElement::from_words_le(output)
