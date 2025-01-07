@@ -68,7 +68,7 @@ impl FieldElement {
 
         // Convert to montgomery form with aR mod p
         let mut mont = FieldElement256::default();
-        fe.mul_unchecked(&R_2_LE, &mut mont);
+        fe.mul(&R_2_LE, &mut mont);
 
         let buffer: [u32; 8] = mont.data;
 
@@ -103,7 +103,7 @@ impl FieldElement {
             } else {
                 let input_words = self.to_words_le();
                 let mut output = [0u32; 8];
-                risc0_bigint2::field::modinv_256_unchecked(
+                risc0_bigint2::field::modinv_256(
                     &input_words,
                     &crate::__risc0::SECP256R1_PRIME,
                     &mut output,

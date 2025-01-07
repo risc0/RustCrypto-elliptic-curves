@@ -74,6 +74,7 @@ impl<C> FieldElement256<C>
 where
     C: PrimeCurveParams,
 {
+    #[inline]
     pub fn mul_unchecked(&self, rhs: &Self, result: &mut Self) {
         risc0_bigint2::field::modmul_256_unchecked(
             &self.data,
@@ -83,6 +84,17 @@ where
         );
     }
 
+    #[inline]
+    pub fn mul(&self, rhs: &Self, result: &mut Self) {
+        risc0_bigint2::field::modmul_256(
+            &self.data,
+            &rhs.data,
+            &C::PRIME_LE_WORDS,
+            &mut result.data,
+        );
+    }
+
+    #[inline]
     pub fn add_unchecked(&self, rhs: &Self, result: &mut Self) {
         risc0_bigint2::field::modadd_256_unchecked(
             &self.data,
