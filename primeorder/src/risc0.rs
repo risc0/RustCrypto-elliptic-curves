@@ -212,6 +212,10 @@ fn affine_to_r0_affine<C>(affine: &AffinePoint<C>) -> ec::AffinePoint<8, C>
 where
     C: PrimeCurveParams,
 {
+    if bool::from(affine.is_identity()) {
+        return ec::AffinePoint::IDENTITY;
+    }
+
     let x = felt_to_u32_words_le::<C>(&affine.x);
     let y = felt_to_u32_words_le::<C>(&affine.y);
     ec::AffinePoint::new_unchecked(x, y)
@@ -230,16 +234,12 @@ where
     C: PrimeCurveParams,
 {
     if let Some(value) = affine.as_u32s() {
-        let x = C::from_u32_words_le(value[0]);
-        let y = C::from_u32_words_le(value[1]);
+        // This should only not be within the modulus with a malicious host, panic in that case.
+        let x = C::from_u32_words_le(value[0]).unwrap();
+        let y = C::from_u32_words_le(value[1]).unwrap();
 
-        x.and_then(|x| {
-            y.map(|y| {
-                let affine = AffinePoint { x, y, infinity: 0 };
-                ProjectivePoint::from(affine)
-            })
-        })
-        .unwrap_or(ProjectivePoint::IDENTITY)
+        let affine = AffinePoint { x, y, infinity: 0 };
+        ProjectivePoint::from(affine)
     } else {
         ProjectivePoint::IDENTITY
     }
