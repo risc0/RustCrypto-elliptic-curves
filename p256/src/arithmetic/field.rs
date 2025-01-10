@@ -63,20 +63,18 @@ primeorder::impl_mont_field_element!(
 
 impl FieldElement {
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-    pub(crate) fn from_words_le(fe: [u32; 8]) -> CtOption<Self> {
+    pub(crate) fn from_words_le(fe: [u32; 8]) -> Self {
         let fe = FieldElement256::new_unchecked(fe);
 
         // Convert to montgomery form with aR mod p
         let mut mont = FieldElement256::default();
+
+        // This mul will check if the result is within the modulus.
         fe.mul(&R_2_LE, &mut mont);
 
-        let buffer: [u32; 8] = mont.data;
+        let uint = U256::from_le_slice(bytemuck::cast_slice::<u32, u8>(&mont.data));
 
-        use crate::elliptic_curve::subtle::ConstantTimeLess as _;
-        let uint = U256::from_le_slice(bytemuck::cast_slice::<u32, u8>(&buffer));
-        let is_within_modulus = uint.ct_lt(&MODULUS);
-
-        CtOption::new(Self(uint), is_within_modulus)
+        Self(uint)
     }
 
     #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
@@ -108,7 +106,8 @@ impl FieldElement {
                     &crate::__risc0::SECP256R1_PRIME,
                     &mut output,
                 );
-                FieldElement::from_words_le(output)
+                let element = FieldElement::from_words_le(output);
+                return CtOption::new(element, Choice::from(1));
             }
         }
 

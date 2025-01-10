@@ -95,5 +95,5 @@ pub trait PrimeCurveParams:
     /// expected layout.
     const EQUATION_B_LE: __risc0::FieldElement256<Self>;
 
-    fn from_u32_words_le(words: [u32; 8]) -> elliptic_curve::subtle::CtOption<Self::FieldElement>;
+    fn from_u32_words_le(words: [u32; 8]) -> Self::FieldElement;
 }

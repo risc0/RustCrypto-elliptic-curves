@@ -235,8 +235,8 @@ where
 {
     if let Some(value) = affine.as_u32s() {
         // This should only not be within the modulus with a malicious host, panic in that case.
-        let x = C::from_u32_words_le(value[0]).unwrap();
-        let y = C::from_u32_words_le(value[1]).unwrap();
+        let x = C::from_u32_words_le(value[0]);
+        let y = C::from_u32_words_le(value[1]);
 
         let affine = AffinePoint { x, y, infinity: 0 };
         ProjectivePoint::from(affine)

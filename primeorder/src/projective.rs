@@ -86,9 +86,7 @@ where
                 &mut buffer,
             );
             let y = C::from_u32_words_le(buffer);
-            return x
-                .and_then(|x| y.map(|y| AffinePoint { x, y, infinity: 0 }))
-                .unwrap_or(AffinePoint::IDENTITY);
+            return AffinePoint { x, y, infinity: 0 };
         }
 
         self.z
