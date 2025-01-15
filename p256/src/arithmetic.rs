@@ -4,22 +4,22 @@
 //!
 //! [NIST SP 800-186]: https://csrc.nist.gov/publications/detail/sp/800-186/final
 
+pub(crate) mod affine;
 pub(crate) mod field;
 #[cfg(feature = "hash2curve")]
 mod hash2curve;
+pub(crate) mod projective;
 pub(crate) mod scalar;
-pub(crate) mod util;
 
 use self::{field::FieldElement, scalar::Scalar};
 use crate::NistP256;
-use elliptic_curve::{CurveArithmetic, PrimeCurveArithmetic};
-use primeorder::{point_arithmetic, PrimeCurveParams};
+use elliptic_curve::{bigint::U256, CurveArithmetic};
 
 /// Elliptic curve point in affine coordinates.
-pub type AffinePoint = primeorder::AffinePoint<NistP256>;
+pub type AffinePoint = affine::AffinePoint;
 
 /// Elliptic curve point in projective coordinates.
-pub type ProjectivePoint = primeorder::ProjectivePoint<NistP256>;
+pub type ProjectivePoint = projective::ProjectivePoint;
 
 impl CurveArithmetic for NistP256 {
     type AffinePoint = AffinePoint;
@@ -27,33 +27,48 @@ impl CurveArithmetic for NistP256 {
     type Scalar = Scalar;
 }
 
-impl PrimeCurveArithmetic for NistP256 {
-    type CurveGroup = ProjectivePoint;
-}
+/// a = -3
+const CURVE_EQUATION_A: FieldElement = FieldElement(U256::from_be_hex(
+    "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC",
+));
 
-/// Adapted from [NIST SP 800-186] § G.1.2: Curve P-256.
-///
-/// [NIST SP 800-186]: https://csrc.nist.gov/publications/detail/sp/800-186/final
-impl PrimeCurveParams for NistP256 {
-    type FieldElement = FieldElement;
-    type PointArithmetic = point_arithmetic::EquationAIsMinusThree;
+const CURVE_EQUATION_B: FieldElement = FieldElement(U256::from_be_hex(
+    "5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B",
+));
 
-    /// a = -3
-    const EQUATION_A: FieldElement = FieldElement::from_u64(3).neg();
+#[cfg(test)]
+mod tests {
+    use super::FieldElement;
+    use crate::{
+        arithmetic::{CURVE_EQUATION_A, CURVE_EQUATION_B},
+        AffinePoint,
+    };
 
-    const EQUATION_B: FieldElement =
-        FieldElement::from_hex("5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b");
+    #[test]
+    fn equation_a_constant() {
+        let equation_a = FieldElement::from_u64(3).neg();
+        assert_eq!(equation_a, CURVE_EQUATION_A);
+    }
 
-    /// Base point of P-256.
-    ///
-    /// Defined in NIST SP 800-186 § G.1.2:
-    ///
-    /// ```text
-    /// Gₓ = 6b17d1f2 e12c4247 f8bce6e5 63a440f2 77037d81 2deb33a0 f4a13945 d898c296
-    /// Gᵧ = 4fe342e2 fe1a7f9b 8ee7eb4a 7c0f9e16 2bce3357 6b315ece cbb64068 37bf51f5
-    /// ```
-    const GENERATOR: (FieldElement, FieldElement) = (
-        FieldElement::from_hex("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"),
-        FieldElement::from_hex("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"),
-    );
+    #[test]
+    fn equation_b_constant() {
+        let equation_b = FieldElement::from_hex(
+            "5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b",
+        );
+        assert_eq!(equation_b, CURVE_EQUATION_B);
+    }
+
+    #[test]
+    fn generator_constant() {
+        let generator: (FieldElement, FieldElement) = (
+            FieldElement::from_hex(
+                "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296",
+            ),
+            FieldElement::from_hex(
+                "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+            ),
+        );
+        assert_eq!(generator.0, AffinePoint::GENERATOR.x);
+        assert_eq!(generator.1, AffinePoint::GENERATOR.y);
+    }
 }
