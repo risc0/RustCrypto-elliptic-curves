@@ -42,6 +42,10 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return crate::__risc0::ec_impl::add(lhs, rhs);
+        }
         let b3 = C::FieldElement::from(3) * C::EQUATION_B;
 
         let t0 = lhs.x * rhs.x; // 1
@@ -100,6 +104,10 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return crate::__risc0::ec_impl::add_mixed(lhs, rhs);
+        }
         let b3 = C::EQUATION_B * C::FieldElement::from(3);
 
         let t0 = lhs.x * rhs.x; // 1
@@ -153,6 +161,10 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return crate::__risc0::ec_impl::double(point);
+        }
         let b3 = C::EQUATION_B * C::FieldElement::from(3);
 
         let t0 = point.x * point.x; // 1
@@ -207,6 +219,10 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return crate::__risc0::ec_impl::add(lhs, rhs);
+        }
         debug_assert_eq!(
             C::EQUATION_A,
             -C::FieldElement::from(3),
@@ -245,6 +261,10 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return crate::__risc0::ec_impl::add_mixed(lhs, rhs);
+        }
         debug_assert_eq!(
             C::EQUATION_A,
             -C::FieldElement::from(3),
@@ -284,6 +304,10 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            return crate::__risc0::ec_impl::double(point);
+        }
         debug_assert_eq!(
             C::EQUATION_A,
             -C::FieldElement::from(3),
