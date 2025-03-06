@@ -62,9 +62,69 @@ primeorder::impl_mont_field_element!(
     fiat_p384_square
 );
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use primeorder::__risc0::FieldElement384;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::field::FIELD_384_WIDTH_WORDS;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+const R_2_LE: FieldElement384<NistP384> = FieldElement384::new_unchecked([
+    0x00000001, 0xfffffffe, 0x00000000, 0x00000002, 0x00000000, 0xfffffffe, 0x00000000, 0x00000002,
+    0x00000001, 0x00000000, 0x00000000, 0x00000000,
+]);
+
 impl FieldElement {
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn from_words_le(fe: [u32; FIELD_384_WIDTH_WORDS]) -> Self {
+        let fe = FieldElement384::new_unchecked(fe);
+
+        // Convert to montgomery form with aR mod p
+        let mut mont = FieldElement384::default();
+
+        // This mul will check if the result is within the modulus.
+        fe.mul(&R_2_LE, &mut mont);
+
+        let uint = U384::from_le_slice(bytemuck::cast_slice::<u32, u8>(&mont.data));
+
+        Self(uint)
+    }
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn to_words_le(&self) -> [u32; FIELD_384_WIDTH_WORDS] {
+        use crate::elliptic_curve::bigint::Encoding;
+        // NOTE: this from mont conversion could be accelerated, but it's very little cycles.
+        let canonical = self.to_canonical();
+        let input = canonical.to_le_bytes();
+        let array = bytemuck::cast::<_, [u32; 12]>(input);
+
+        array
+    }
+
     /// Compute [`FieldElement`] inversion: `1 / self`.
     pub fn invert(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::elliptic_curve::bigint::Encoding;
+
+            // NOTE: This is not a constant time operation, as inverting zero in the zkvm is not
+            // possible as it will panic in the host.
+            if self.is_zero().into() {
+                return CtOption::new(FieldElement::ZERO, Choice::from(0));
+            } else {
+                let input_words = self.to_words_le();
+                let mut output = [0u32; FIELD_384_WIDTH_WORDS];
+                risc0_bigint2::field::modinv_384(
+                    &input_words,
+                    &crate::__risc0::SECP384R1_PRIME,
+                    &mut output,
+                );
+                let element = FieldElement::from_words_le(output);
+                return CtOption::new(element, Choice::from(1));
+            }
+        }
+        
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         CtOption::new(self.invert_unchecked(), !self.is_zero())
     }
 
