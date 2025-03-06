@@ -92,9 +92,12 @@ where
             return AffinePoint { x, y, infinity: 0 };
         }
 
-        <C::FieldElement as Field>::invert(&self.z)
-            .map(|zinv| self.to_affine_internal(zinv))
-            .unwrap_or(AffinePoint::IDENTITY)
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+        {
+            <C::FieldElement as Field>::invert(&self.z)
+                .map(|zinv| self.to_affine_internal(zinv))
+                .unwrap_or(AffinePoint::IDENTITY)
+        }
     }
 
     pub(super) fn to_affine_internal(self, zinv: C::FieldElement) -> AffinePoint<C> {
@@ -143,7 +146,7 @@ where
         {
             crate::__risc0::ec_impl::mul(self, k)
         }
-        
+
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         {
             let k = Into::<C::Uint>::into(*k).to_le_byte_array();

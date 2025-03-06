@@ -305,7 +305,7 @@ pub(crate) mod ec_impl {
         let lhs = projective_to_affine::<C>(lhs);
         let rhs = affine_to_r0_affine(rhs);
 
-        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
+        let mut result = ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
         lhs.add(&rhs, &mut result);
         return affine_to_projective(&result);
     }
@@ -323,7 +323,7 @@ pub(crate) mod ec_impl {
     {
         let point = projective_to_affine::<C>(point);
 
-        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
+        let mut result = ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
         point.double(&mut result);
         return affine_to_projective(&result);
     }
