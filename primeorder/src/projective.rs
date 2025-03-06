@@ -60,6 +60,38 @@ where
 
     /// Returns the affine representation of this point, or `None` if it is the identity.
     pub fn to_affine(&self) -> AffinePoint<C> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::__risc0::felt_to_u32_words_le;
+            if self.z.is_zero().into() {
+                return AffinePoint::IDENTITY;
+            }
+            let z = felt_to_u32_words_le::<C>(&self.z);
+            let mut z_inv = [0u32; risc0_bigint2::field::FIELD_384_WIDTH_WORDS];
+            risc0_bigint2::field::modinv_384_unchecked(&z, &C::PRIME_LE_WORDS, &mut z_inv);
+
+            let mut buffer = [0u32; risc0_bigint2::field::FIELD_384_WIDTH_WORDS];
+            let x_buffer = felt_to_u32_words_le::<C>(&self.x);
+            let y_buffer = felt_to_u32_words_le::<C>(&self.y);
+            risc0_bigint2::field::modmul_384_unchecked(
+                &x_buffer,
+                &z_inv,
+                &C::PRIME_LE_WORDS,
+                &mut buffer,
+            );
+
+            let x = C::from_u32_words_le(buffer);
+
+            risc0_bigint2::field::modmul_384_unchecked(
+                &y_buffer,
+                &z_inv,
+                &C::PRIME_LE_WORDS,
+                &mut buffer,
+            );
+            let y = C::from_u32_words_le(buffer);
+            return AffinePoint { x, y, infinity: 0 };
+        }
+
         <C::FieldElement as Field>::invert(&self.z)
             .map(|zinv| self.to_affine_internal(zinv))
             .unwrap_or(AffinePoint::IDENTITY)
@@ -107,46 +139,54 @@ where
     where
         Self: Double,
     {
-        let k = Into::<C::Uint>::into(*k).to_le_byte_array();
-
-        let mut pc = [Self::default(); 16];
-        pc[0] = Self::IDENTITY;
-        pc[1] = *self;
-
-        for i in 2..16 {
-            pc[i] = if i % 2 == 0 {
-                Double::double(&pc[i / 2])
-            } else {
-                pc[i - 1].add(self)
-            };
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            crate::__risc0::ec_impl::mul(self, k)
         }
+        
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+        {
+            let k = Into::<C::Uint>::into(*k).to_le_byte_array();
 
-        let mut q = Self::IDENTITY;
-        let mut pos = C::Uint::BITS - 4;
+            let mut pc = [Self::default(); 16];
+            pc[0] = Self::IDENTITY;
+            pc[1] = *self;
 
-        loop {
-            let slot = (k[pos >> 3] >> (pos & 7)) & 0xf;
-
-            let mut t = ProjectivePoint::IDENTITY;
-
-            for i in 1..16 {
-                t.conditional_assign(
-                    &pc[i],
-                    Choice::from(((slot as usize ^ i).wrapping_sub(1) >> 8) as u8 & 1),
-                );
+            for i in 2..16 {
+                pc[i] = if i % 2 == 0 {
+                    Double::double(&pc[i / 2])
+                } else {
+                    pc[i - 1].add(self)
+                };
             }
 
-            q = q.add(&t);
+            let mut q = Self::IDENTITY;
+            let mut pos = C::Uint::BITS - 4;
 
-            if pos == 0 {
-                break;
+            loop {
+                let slot = (k[pos >> 3] >> (pos & 7)) & 0xf;
+
+                let mut t = ProjectivePoint::IDENTITY;
+
+                for i in 1..16 {
+                    t.conditional_assign(
+                        &pc[i],
+                        Choice::from(((slot as usize ^ i).wrapping_sub(1) >> 8) as u8 & 1),
+                    );
+                }
+
+                q = q.add(&t);
+
+                if pos == 0 {
+                    break;
+                }
+
+                q = Double::double(&Double::double(&Double::double(&Double::double(&q))));
+                pos -= 4;
             }
 
-            q = Double::double(&Double::double(&Double::double(&Double::double(&q))));
-            pos -= 4;
+            q
         }
-
-        q
     }
 }
 
@@ -417,6 +457,7 @@ where
     Self: Double,
     C: PrimeCurveParams,
 {
+    // TODO optimize impl for r0
 }
 
 impl<C> MulByGenerator for ProjectivePoint<C>

@@ -290,41 +290,41 @@ pub(crate) mod ec_impl {
         return affine_to_projective(&result);
     }
 
-    // /// Implements complete mixed addition for curves with `a = -3`
-    // ///
-    // /// Implements the complete mixed addition formula from [Renes-Costello-Batina 2015]
-    // /// (Algorithm 5). The comments after each line indicate which algorithm
-    // /// steps are being performed.
-    // ///
-    // /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
-    // #[inline]
-    // pub(crate) fn add_mixed<C>(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C>
-    // where
-    //     C: PrimeCurveParams,
-    // {
-    //     let lhs = projective_to_affine::<C>(lhs);
-    //     let rhs = affine_to_r0_affine(rhs);
+    /// Implements complete mixed addition for curves with `a = -3`
+    ///
+    /// Implements the complete mixed addition formula from [Renes-Costello-Batina 2015]
+    /// (Algorithm 5). The comments after each line indicate which algorithm
+    /// steps are being performed.
+    ///
+    /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
+    #[inline]
+    pub(crate) fn add_mixed<C>(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C>
+    where
+        C: PrimeCurveParams,
+    {
+        let lhs = projective_to_affine::<C>(lhs);
+        let rhs = affine_to_r0_affine(rhs);
 
-    //     let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
-    //     lhs.add(&rhs, &mut result);
-    //     return affine_to_projective(&result);
-    // }
+        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
+        lhs.add(&rhs, &mut result);
+        return affine_to_projective(&result);
+    }
 
-    // /// Implements point doubling for curves with `a = -3`
-    // ///
-    // /// Implements the exception-free point doubling formula from [Renes-Costello-Batina 2015]
-    // /// (Algorithm 6). The comments after each line indicate which algorithm
-    // /// steps are being performed.
-    // ///
-    // /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
-    // pub(crate) fn double<C>(point: &ProjectivePoint<C>) -> ProjectivePoint<C>
-    // where
-    //     C: PrimeCurveParams,
-    // {
-    //     let point = projective_to_affine::<C>(point);
+    /// Implements point doubling for curves with `a = -3`
+    ///
+    /// Implements the exception-free point doubling formula from [Renes-Costello-Batina 2015]
+    /// (Algorithm 6). The comments after each line indicate which algorithm
+    /// steps are being performed.
+    ///
+    /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
+    pub(crate) fn double<C>(point: &ProjectivePoint<C>) -> ProjectivePoint<C>
+    where
+        C: PrimeCurveParams,
+    {
+        let point = projective_to_affine::<C>(point);
 
-    //     let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
-    //     point.double(&mut result);
-    //     return affine_to_projective(&result);
-    // }
+        let mut result = risc0_bigint2::ec::AffinePoint::new_unchecked([0u32; FIELD_384_WIDTH_WORDS], [0u32; FIELD_384_WIDTH_WORDS]);
+        point.double(&mut result);
+        return affine_to_projective(&result);
+    }
 }
