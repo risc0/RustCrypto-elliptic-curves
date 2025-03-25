@@ -23,9 +23,7 @@ elliptic-curve = { version = "0.13", default-features = false, features = ["arit
 serdect = { version = "0.2", optional = true, default-features = false }
 
 [target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
-# TODO: Use a real version onece released
-# risc0-bigint2 = { version = "1.4.0", features = ["unstable"] }
-risc0-bigint2 = { git = "https://github.com/risc0/risc0.git", rev = "4c65c85a1ec6ce7df165ef9c57e1e13e323f7e01", features = ["unstable"] }
+risc0-bigint2 = { version = "1.4.0", features = ["unstable"] }
 bytemuck = "1"
 
 [features]
