@@ -65,12 +65,12 @@ where
             }
             let z = felt_to_u32_words_le::<C>(&self.z);
             let mut z_inv = [0u32; 8];
-            risc0_bigint2::field::modinv_256_unchecked(&z, &C::PRIME_LE_WORDS, &mut z_inv);
+            risc0_bigint2::field::unchecked::modinv_256(&z, &C::PRIME_LE_WORDS, &mut z_inv);
 
             let mut buffer = [0u32; 8];
             let x_buffer = felt_to_u32_words_le::<C>(&self.x);
             let y_buffer = felt_to_u32_words_le::<C>(&self.y);
-            risc0_bigint2::field::modmul_256_unchecked(
+            risc0_bigint2::field::unchecked::modmul_256(
                 &x_buffer,
                 &z_inv,
                 &C::PRIME_LE_WORDS,
@@ -79,7 +79,7 @@ where
 
             let x = C::from_u32_words_le(buffer);
 
-            risc0_bigint2::field::modmul_256_unchecked(
+            risc0_bigint2::field::unchecked::modmul_256(
                 &y_buffer,
                 &z_inv,
                 &C::PRIME_LE_WORDS,
