@@ -29,7 +29,7 @@ use core::{
     ops::{AddAssign, MulAssign, Neg, Shr, ShrAssign, SubAssign},
 };
 use elliptic_curve::{
-    bigint::{ArrayEncoding, Limb},
+    bigint::{ArrayEncoding, Encoding, Limb},
     ff::PrimeField,
     ops::{Invert, Reduce},
     scalar::{FromUintUnchecked, IsHigh},
@@ -117,9 +117,13 @@ impl Scalar {
                     &crate::__risc0::SECP384R1_ORDER,
                     &mut output,
                 );
+                // PRESTON: doing from_uint_unchecked twice for some reason
+                // gets us the same output as using the impl_bernstein_yang_invert! macro
                 let bytes = bytemuck::cast_slice::<u32, u8>(&output);
-                let res = Scalar(U384::from_le_slice(bytes));
-                CtOption::new(res, Choice::from(1))
+                let res = Scalar::from_uint_unchecked(U384::from_le_slice(bytes));
+                let resres = Scalar::from_uint_unchecked(res.0);
+                // panic!("resres: {:x?}", resres);
+                CtOption::new(resres, Choice::from(1))
             }
         }
         
