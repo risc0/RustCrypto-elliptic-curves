@@ -70,6 +70,10 @@ where
             let mut z_inv = [0u32; risc0_bigint2::field::FIELD_384_WIDTH_WORDS];
             risc0_bigint2::field::modinv_384_unchecked(&z, &C::PRIME_LE_WORDS, &mut z_inv);
 
+            // let mut z_inv_rs = <C::FieldElement as Field>::invert(&self.z).unwrap();
+
+            println!("z_input: {:?}, z_inv_risc0: {:?}", &self.z, z_inv);
+
             let mut buffer = [0u32; risc0_bigint2::field::FIELD_384_WIDTH_WORDS];
             let x_buffer = felt_to_u32_words_le::<C>(&self.x);
             let y_buffer = felt_to_u32_words_le::<C>(&self.y);
@@ -82,6 +86,11 @@ where
 
             let x = C::from_u32_words_le(buffer);
 
+            println!("input x: {:?}", &self.x);
+            println!("x words: {:x?}", x_buffer);
+            println!("x_inv_buffer: {:x?}", buffer);
+            println!("x_inv: {:?}", x);
+
             risc0_bigint2::field::modmul_384_unchecked(
                 &y_buffer,
                 &z_inv,
@@ -89,6 +98,12 @@ where
                 &mut buffer,
             );
             let y = C::from_u32_words_le(buffer);
+
+            println!("input y: {:?}", &self.y);
+            println!("y words: {:x?}", y_buffer);
+            println!("y_inv_buffer: {:x?}", buffer);
+            println!("y_inv: {:?}", y);
+
             return AffinePoint { x, y, infinity: 0 };
         }
 

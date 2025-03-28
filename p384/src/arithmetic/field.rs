@@ -70,8 +70,8 @@ use risc0_bigint2::field::FIELD_384_WIDTH_WORDS;
 
 #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
 const R_2_LE: FieldElement384<NistP384> = FieldElement384::new_unchecked([
-    0x00000001, 0xfffffffe, 0x00000000, 0x00000002, 0x00000000, 0xfffffffe, 0x00000000, 0x00000002,
-    0x00000001, 0x00000000, 0x00000000, 0x00000000,
+    0x00000001, 0x00000000, 0x10000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE, 0x00000000,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000
 ]);
 
 impl FieldElement {
