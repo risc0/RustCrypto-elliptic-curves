@@ -68,7 +68,7 @@ where
             }
             let z = felt_to_u32_words_le::<C>(&self.z);
             let mut z_inv = [0u32; risc0_bigint2::field::FIELD_384_WIDTH_WORDS];
-            risc0_bigint2::field::modinv_384_unchecked(&z, &C::PRIME_LE_WORDS, &mut z_inv);
+            risc0_bigint2::field::unchecked::modinv_384(&z, &C::PRIME_LE_WORDS, &mut z_inv);
 
             // let mut z_inv_rs = <C::FieldElement as Field>::invert(&self.z).unwrap();
 
@@ -77,7 +77,7 @@ where
             let mut buffer = [0u32; risc0_bigint2::field::FIELD_384_WIDTH_WORDS];
             let x_buffer = felt_to_u32_words_le::<C>(&self.x);
             let y_buffer = felt_to_u32_words_le::<C>(&self.y);
-            risc0_bigint2::field::modmul_384_unchecked(
+            risc0_bigint2::field::unchecked::modmul_384(
                 &x_buffer,
                 &z_inv,
                 &C::PRIME_LE_WORDS,
@@ -91,7 +91,7 @@ where
             // println!("x_inv_buffer: {:x?}", buffer);
             // println!("x_inv: {:?}", x);
 
-            risc0_bigint2::field::modmul_384_unchecked(
+            risc0_bigint2::field::unchecked::modmul_384(
                 &y_buffer,
                 &z_inv,
                 &C::PRIME_LE_WORDS,

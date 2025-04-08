@@ -77,7 +77,7 @@ where
 {
     #[inline]
     pub fn mul_unchecked(&self, rhs: &Self, result: &mut Self) {
-        risc0_bigint2::field::modmul_384_unchecked(
+        risc0_bigint2::field::unchecked::modmul_384(
             &self.data,
             &rhs.data,
             &C::PRIME_LE_WORDS,
@@ -97,7 +97,7 @@ where
 
     #[inline]
     pub fn add_unchecked(&self, rhs: &Self, result: &mut Self) {
-        risc0_bigint2::field::modadd_384_unchecked(
+        risc0_bigint2::field::unchecked::modadd_384(
             &self.data,
             &rhs.data,
             &C::PRIME_LE_WORDS,
