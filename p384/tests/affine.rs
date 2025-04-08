@@ -2,7 +2,11 @@
 
 // TODO(tarcieri): point compaction support
 
-#![cfg(all(feature = "arithmetic", feature = "test-vectors"))]
+#![cfg(all(
+    feature = "arithmetic",
+    feature = "test-vectors",
+    not(all(target_os = "zkvm", target_arch = "riscv32"))
+))]
 
 use elliptic_curve::{
     group::{prime::PrimeCurveAffine, GroupEncoding},

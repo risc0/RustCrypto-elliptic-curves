@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo.svg",
@@ -21,6 +21,10 @@
 
 #[cfg(feature = "arithmetic")]
 mod arithmetic;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+#[path = "risc0.rs"]
+mod __risc0;
 
 #[cfg(feature = "ecdh")]
 pub mod ecdh;

@@ -19,6 +19,10 @@ rust-version = "1.65"
 [dependencies]
 elliptic-curve = { version = "0.13.8", default-features = false, features = ["arithmetic", "sec1"] }
 
+[target.'cfg(all(target_os = "zkvm", target_arch = "riscv32"))'.dependencies]
+risc0-bigint2 = { version = "1.4.0", features = ["unstable"]}
+bytemuck = "1"
+
 # optional dependencies
 serdect = { version = "0.2", optional = true, default-features = false }
 

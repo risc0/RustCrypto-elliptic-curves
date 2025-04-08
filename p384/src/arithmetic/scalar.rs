@@ -29,7 +29,7 @@ use core::{
     ops::{AddAssign, MulAssign, Neg, Shr, ShrAssign, SubAssign},
 };
 use elliptic_curve::{
-    bigint::{ArrayEncoding, Limb},
+    bigint::{ArrayEncoding, Encoding, Limb},
     ff::PrimeField,
     ops::{Invert, Reduce},
     scalar::{FromUintUnchecked, IsHigh},
@@ -100,6 +100,34 @@ primeorder::impl_mont_field_element!(
 impl Scalar {
     /// Compute [`Scalar`] inversion: `1 / self`.
     pub fn invert(&self) -> CtOption<Self> {
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            use crate::elliptic_curve::bigint::Encoding;
+
+            // NOTE: This is not a constant time operation, as inverting zero in the zkvm is not
+            // possible as it will panic in the host.
+            if self.is_zero().into() {
+                return CtOption::new(Scalar::ZERO, Choice::from(0));
+            } else {
+                let input = self.0.to_le_bytes();
+                let input_words = bytemuck::cast::<_, [u32; 12]>(input);
+                let mut output = [0u32; 12];
+                risc0_bigint2::field::modinv_384(
+                    &input_words,
+                    &crate::__risc0::SECP384R1_ORDER,
+                    &mut output,
+                );
+                // PRESTON: doing from_uint_unchecked twice for some reason
+                // gets us the same output as using the impl_bernstein_yang_invert! macro
+                let bytes = bytemuck::cast_slice::<u32, u8>(&output);
+                let res = Scalar::from_uint_unchecked(U384::from_le_slice(bytes));
+                let resres = Scalar::from_uint_unchecked(res.0);
+                // panic!("resres: {:x?}", resres);
+                CtOption::new(resres, Choice::from(1))
+            }
+        }
+        
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         CtOption::new(self.invert_unchecked(), !self.is_zero())
     }
 

@@ -30,6 +30,12 @@ impl PrimeCurveArithmetic for NistP384 {
     type CurveGroup = ProjectivePoint;
 }
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use primeorder::__risc0::FieldElement384;
+
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use risc0_bigint2::field::FIELD_384_WIDTH_WORDS;
+
 /// Adapted from [NIST SP 800-186] § G.1.3: Curve P-384.
 ///
 /// [NIST SP 800-186]: https://csrc.nist.gov/publications/detail/sp/800-186/final
@@ -58,4 +64,23 @@ impl PrimeCurveParams for NistP384 {
         FieldElement::from_hex("aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7"),
         FieldElement::from_hex("3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f"),
     );
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const PRIME_LE_WORDS: [u32; FIELD_384_WIDTH_WORDS] = crate::__risc0::SECP384R1_PRIME;
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const ORDER_LE_WORDS: [u32; FIELD_384_WIDTH_WORDS] = crate::__risc0::SECP384R1_ORDER;
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const EQUATION_A_LE: FieldElement384<NistP384> =
+        FieldElement384::new_unchecked(crate::__risc0::SECP384R1_EQUATION_A_LE);
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    const EQUATION_B_LE: FieldElement384<NistP384> =
+        FieldElement384::new_unchecked(crate::__risc0::SECP384R1_EQUATION_B_LE);
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    fn from_u32_words_le(words: [u32; FIELD_384_WIDTH_WORDS]) -> FieldElement {
+        FieldElement::from_words_le(words)
+    }
 }
