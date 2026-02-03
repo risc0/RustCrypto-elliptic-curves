@@ -41,6 +41,18 @@ use primeorder::impl_bernstein_yang_invert;
 /// p = 2^{384} − 2^{128} − 2^{96} + 2^{32} − 1
 pub(crate) const MODULUS: U384 = U384::from_be_hex(FieldElement::MODULUS);
 
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use primeorder::__risc0::FieldElement384;
+
+/// R = 2^384 mod p (for Montgomery conversion via standard modular multiplication)
+/// When multiplied with canonical value x: x * R mod p gives Montgomery form
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+const R_MOD_P_LE: FieldElement384<NistP384> = FieldElement384::new_unchecked([
+    0x00000001, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
+    0x00000001, 0x00000000, 0x00000000, 0x00000000,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000,
+]);
+
 /// Element of the secp384r1 base field used for curve coordinates.
 #[derive(Clone, Copy)]
 pub struct FieldElement(pub(super) U384);
@@ -62,6 +74,35 @@ primeorder::impl_mont_field_element!(
 );
 
 impl FieldElement {
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn from_words_le(fe: [u32; 12]) -> Self {
+        let fe = FieldElement384::<NistP384>::new_unchecked(fe);
+
+        // Convert to montgomery form with aR mod p
+        let mut mont = FieldElement384::<NistP384>::default();
+
+        // Multiply by R to convert to Montgomery form (standard modular multiplication)
+        risc0_bigint2::field::modmul_384(
+            &fe.data,
+            &R_MOD_P_LE.data,
+            &crate::__risc0::SECP384R1_PRIME,
+            &mut mont.data,
+        );
+
+        let uint = U384::from_le_slice(bytemuck::cast_slice::<u32, u8>(&mont.data));
+
+        Self(uint)
+    }
+
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn to_words_le(&self) -> [u32; 12] {
+        use elliptic_curve::bigint::Encoding;
+        // Convert from Montgomery to canonical form
+        let canonical = self.to_canonical();
+        let input = canonical.to_le_bytes();
+        bytemuck::cast::<_, [u32; 12]>(input)
+    }
+
     /// Compute [`FieldElement`] inversion: `1 / self`.
     pub fn invert(&self) -> CtOption<Self> {
         CtOption::new(self.invert_unchecked(), !self.is_zero())

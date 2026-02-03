@@ -1747,6 +1747,7 @@ name = "p384"
 version = "0.13.0"
 dependencies = [
  "blobby",
+ "bytemuck",
  "criterion",
  "ecdsa",
  "elliptic-curve",
@@ -1754,6 +1755,7 @@ dependencies = [
  "primeorder",
  "proptest",
  "rand_core",
+ "risc0-bigint2",
  "serdect",
  "sha2",
 ]
@@ -2212,9 +2214,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-bigint2"
-version = "1.2.1"
+version = "1.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7549b31ad8d81afea787c807803a592bc73151926bbb951a6823e23d998c34f0"
+checksum = "af3997ed5c8a35afd2fa39055f1b841e19571379e55ee634a06c41d7b924052d"
 dependencies = [
  "include_bytes_aligned",
  "stability",

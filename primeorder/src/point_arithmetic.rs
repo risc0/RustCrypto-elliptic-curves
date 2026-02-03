@@ -6,9 +6,13 @@
 use elliptic_curve::{subtle::ConditionallySelectable, Field};
 
 use crate::{AffinePoint, PrimeCurveParams, ProjectivePoint};
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+use crate::{PrimeCurveParams256, PrimeCurveParams384};
 
 mod sealed {
     use crate::{AffinePoint, PrimeCurveParams, ProjectivePoint};
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    use crate::PrimeCurveParams384;
 
     /// Elliptic point arithmetic implementation
     ///
@@ -24,15 +28,32 @@ mod sealed {
         /// Returns `point + point`
         fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C>;
     }
+
+    /// Elliptic point arithmetic implementation for 384-bit curves
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub trait PointArithmetic384<C: PrimeCurveParams384> {
+        /// Returns `lhs + rhs`
+        fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C>;
+
+        /// Returns `lhs + rhs`
+        fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C>;
+
+        /// Returns `point + point`
+        fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C>;
+    }
 }
 
 /// Allow crate-local visibility
 pub(crate) use sealed::PointArithmetic;
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub(crate) use sealed::PointArithmetic384;
 
 /// The 𝒂-coefficient of the short Weierstrass equation does not have specific
 /// properties which allow for an optimized implementation.
 pub struct EquationAIsGeneric {}
 
+/// Software fallback for non-zkvm targets
+#[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
 impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     /// Implements complete addition for any curve
     ///
@@ -42,10 +63,6 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
-            return crate::__risc0::ec_impl::add(lhs, rhs);
-        }
         let b3 = C::FieldElement::from(3) * C::EQUATION_B;
 
         let t0 = lhs.x * rhs.x; // 1
@@ -104,10 +121,6 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
-            return crate::__risc0::ec_impl::add_mixed(lhs, rhs);
-        }
         let b3 = C::EQUATION_B * C::FieldElement::from(3);
 
         let t0 = lhs.x * rhs.x; // 1
@@ -161,10 +174,6 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
-            return crate::__risc0::ec_impl::double(point);
-        }
         let b3 = C::EQUATION_B * C::FieldElement::from(3);
 
         let t0 = point.x * point.x; // 1
@@ -207,9 +216,27 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsGeneric {
     }
 }
 
+/// Accelerated implementation for zkvm targets (256-bit curves)
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+impl<C: PrimeCurveParams256> PointArithmetic<C> for EquationAIsGeneric {
+    fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl::add(lhs, rhs)
+    }
+
+    fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl::add_mixed(lhs, rhs)
+    }
+
+    fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl::double(point)
+    }
+}
+
 /// The 𝒂-coefficient of the short Weierstrass equation is -3.
 pub struct EquationAIsMinusThree {}
 
+/// Software fallback for non-zkvm targets
+#[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
 impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     /// Implements complete addition for curves with `a = -3`
     ///
@@ -219,10 +246,6 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
-            return crate::__risc0::ec_impl::add(lhs, rhs);
-        }
         debug_assert_eq!(
             C::EQUATION_A,
             -C::FieldElement::from(3),
@@ -261,10 +284,6 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
-            return crate::__risc0::ec_impl::add_mixed(lhs, rhs);
-        }
         debug_assert_eq!(
             C::EQUATION_A,
             -C::FieldElement::from(3),
@@ -304,10 +323,6 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
     ///
     /// [Renes-Costello-Batina 2015]: https://eprint.iacr.org/2015/1060
     fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-        {
-            return crate::__risc0::ec_impl::double(point);
-        }
         debug_assert_eq!(
             C::EQUATION_A,
             -C::FieldElement::from(3),
@@ -338,5 +353,58 @@ impl<C: PrimeCurveParams> PointArithmetic<C> for EquationAIsMinusThree {
         let z = (yz2 * yy).double().double(); // 32, 33, 34
 
         ProjectivePoint { x, y, z }
+    }
+}
+
+/// Accelerated implementation for zkvm targets (256-bit curves)
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+impl<C: PrimeCurveParams256> PointArithmetic<C> for EquationAIsMinusThree {
+    fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl::add(lhs, rhs)
+    }
+
+    fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl::add_mixed(lhs, rhs)
+    }
+
+    fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl::double(point)
+    }
+}
+
+/// The 𝒂-coefficient of the short Weierstrass equation is -3 (384-bit curves).
+/// This implementation uses risc0-bigint2 EC acceleration.
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+pub struct EquationAIsMinusThree384 {}
+
+/// PointArithmetic impl for 384-bit curves (used by PrimeCurveParams::PointArithmetic)
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+impl<C: PrimeCurveParams384> PointArithmetic<C> for EquationAIsMinusThree384 {
+    fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl_384::add(lhs, rhs)
+    }
+
+    fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl_384::add_mixed(lhs, rhs)
+    }
+
+    fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl_384::double(point)
+    }
+}
+
+/// PointArithmetic384 impl (used by PrimeCurveParams384::PointArithmetic)
+#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+impl<C: PrimeCurveParams384> PointArithmetic384<C> for EquationAIsMinusThree384 {
+    fn add(lhs: &ProjectivePoint<C>, rhs: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl_384::add(lhs, rhs)
+    }
+
+    fn add_mixed(lhs: &ProjectivePoint<C>, rhs: &AffinePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl_384::add_mixed(lhs, rhs)
+    }
+
+    fn double(point: &ProjectivePoint<C>) -> ProjectivePoint<C> {
+        crate::__risc0::ec_impl_384::double(point)
     }
 }

@@ -59,36 +59,10 @@ where
     pub fn to_affine(&self) -> AffinePoint<C> {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            use crate::__risc0::felt_to_u32_words_le;
-            if self.z.is_zero().into() {
-                return AffinePoint::IDENTITY;
-            }
-            let z = felt_to_u32_words_le::<C>(&self.z);
-            let mut z_inv = [0u32; 8];
-            risc0_bigint2::field::unchecked::modinv_256(&z, &C::PRIME_LE_WORDS, &mut z_inv);
-
-            let mut buffer = [0u32; 8];
-            let x_buffer = felt_to_u32_words_le::<C>(&self.x);
-            let y_buffer = felt_to_u32_words_le::<C>(&self.y);
-            risc0_bigint2::field::unchecked::modmul_256(
-                &x_buffer,
-                &z_inv,
-                &C::PRIME_LE_WORDS,
-                &mut buffer,
-            );
-
-            let x = C::from_u32_words_le(buffer);
-
-            risc0_bigint2::field::unchecked::modmul_256(
-                &y_buffer,
-                &z_inv,
-                &C::PRIME_LE_WORDS,
-                &mut buffer,
-            );
-            let y = C::from_u32_words_le(buffer);
-            return AffinePoint { x, y, infinity: 0 };
+            return C::zkvm_to_affine(self);
         }
 
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         self.z
             .invert()
             .map(|zinv| AffinePoint {
@@ -135,7 +109,7 @@ where
     {
         #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
         {
-            crate::__risc0::ec_impl::mul(self, k)
+            C::zkvm_mul(self, k)
         }
         #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
         {
