@@ -123,14 +123,9 @@ impl Scalar {
         }
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn mul_denormalized(&self, rhs: &Scalar) -> Scalar {
-        cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))] {
-                Self(risc0::modmul_u256_denormalized(&self.0, &rhs.0, &ORDER))
-            } else {
-                WideScalar::mul_wide(self, rhs).reduce()
-            }
-        }
+        WideScalar::mul_wide(self, rhs).reduce()
     }
 
     /// Modulo squares the scalar.
@@ -138,16 +133,9 @@ impl Scalar {
         self.mul(self)
     }
 
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn square_denormalized(&self) -> Self {
         self.mul_denormalized(self)
-    }
-
-    #[inline(always)]
-    fn normalize(&self) -> Self {
-        if cfg!(all(target_os = "zkvm", target_arch = "riscv32")) {
-            assert!(bool::from(self.0.ct_lt(&ORDER)));
-        }
-        self.clone()
     }
 
     /// Right shifts the scalar.
@@ -159,24 +147,37 @@ impl Scalar {
 
     /// Inverts the scalar.
     pub fn invert(&self) -> CtOption<Self> {
-        // Using an addition chain from
-        // https://briansmith.org/ecc-inversion-addition-chains-01#secp256k1_scalar_inversion
-        let x_1 = *self;
-        let x_10 = self.pow2k(1);
-        let x_11 = x_10.mul_denormalized(&x_1);
-        let x_101 = x_10.mul_denormalized(&x_11);
-        let x_111 = x_10.mul_denormalized(&x_101);
-        let x_1001 = x_10.mul_denormalized(&x_111);
-        let x_1011 = x_10.mul_denormalized(&x_1001);
-        let x_1101 = x_10.mul_denormalized(&x_1011);
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            let is_nonzero = !self.is_zero();
+            let input = Self::conditional_select(&Self::ONE, self, is_nonzero);
+            let mut output = [0u32; 8];
 
-        let x6 = x_1101.pow2k(2).mul_denormalized(&x_1011);
-        let x8 = x6.pow2k(2).mul_denormalized(&x_11);
-        let x14 = x8.pow2k(6).mul_denormalized(&x6);
-        let x28 = x14.pow2k(14).mul_denormalized(&x14);
-        let x56 = x28.pow2k(28).mul_denormalized(&x28);
+            risc0_bigint2::field::modinv_256(&input.0.to_words(), &MODULUS, &mut output);
 
-        #[rustfmt::skip]
+            CtOption::new(Self(U256::from_words(output)), is_nonzero)
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+        {
+            // Using an addition chain from
+            // https://briansmith.org/ecc-inversion-addition-chains-01#secp256k1_scalar_inversion
+            let x_1 = *self;
+            let x_10 = self.pow2k(1);
+            let x_11 = x_10.mul_denormalized(&x_1);
+            let x_101 = x_10.mul_denormalized(&x_11);
+            let x_111 = x_10.mul_denormalized(&x_101);
+            let x_1001 = x_10.mul_denormalized(&x_111);
+            let x_1011 = x_10.mul_denormalized(&x_1001);
+            let x_1101 = x_10.mul_denormalized(&x_1011);
+
+            let x6 = x_1101.pow2k(2).mul_denormalized(&x_1011);
+            let x8 = x6.pow2k(2).mul_denormalized(&x_11);
+            let x14 = x8.pow2k(6).mul_denormalized(&x6);
+            let x28 = x14.pow2k(14).mul_denormalized(&x14);
+            let x56 = x28.pow2k(28).mul_denormalized(&x28);
+
+            #[rustfmt::skip]
             let res = x56
             .pow2k(56).mul_denormalized(&x56)
             .pow2k(14).mul_denormalized(&x14)
@@ -205,7 +206,8 @@ impl Scalar {
             .pow2k(6).mul_denormalized(&x_1)
             .pow2k(8).mul_denormalized(&x6);
 
-        CtOption::new(res.normalize(), !self.is_zero())
+            CtOption::new(res, !self.is_zero())
+        }
     }
 
     /// Returns the scalar modulus as a `BigUint` object.
@@ -244,6 +246,7 @@ impl Scalar {
     }
 
     /// Raises the scalar to the power `2^k`.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     fn pow2k(&self, k: usize) -> Self {
         let mut x = *self;
         for _j in 0..k {
