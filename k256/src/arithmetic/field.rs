@@ -185,34 +185,42 @@ impl FieldElement {
     /// Returns the multiplicative inverse of self, if self is non-zero.
     /// The result has magnitude 1, but is not normalized.
     pub fn invert(&self) -> CtOption<Self> {
-        // The binary representation of (p - 2) has 5 blocks of 1s, with lengths in
-        // { 1, 2, 22, 223 }. Use an addition chain to calculate 2^n - 1 for each block:
-        // [1], [2], 3, 6, 9, 11, [22], 44, 88, 176, 220, [223]
+        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        {
+            self.0.invert().map(Self)
+        }
 
-        let x2 = self.pow2k(1).mul(self);
-        let x3 = x2.pow2k(1).mul(self);
-        let x6 = x3.pow2k(3).mul(&x3);
-        let x9 = x6.pow2k(3).mul(&x3);
-        let x11 = x9.pow2k(2).mul(&x2);
-        let x22 = x11.pow2k(11).mul(&x11);
-        let x44 = x22.pow2k(22).mul(&x22);
-        let x88 = x44.pow2k(44).mul(&x44);
-        let x176 = x88.pow2k(88).mul(&x88);
-        let x220 = x176.pow2k(44).mul(&x44);
-        let x223 = x220.pow2k(3).mul(&x3);
+        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+        {
+            // The binary representation of (p - 2) has 5 blocks of 1s, with lengths in
+            // { 1, 2, 22, 223 }. Use an addition chain to calculate 2^n - 1 for each block:
+            // [1], [2], 3, 6, 9, 11, [22], 44, 88, 176, 220, [223]
 
-        // The final result is then assembled using a sliding window over the blocks.
-        let res = x223
-            .pow2k(23)
-            .mul(&x22)
-            .pow2k(5)
-            .mul(self)
-            .pow2k(3)
-            .mul(&x2)
-            .pow2k(2)
-            .mul(self);
+            let x2 = self.pow2k(1).mul(self);
+            let x3 = x2.pow2k(1).mul(self);
+            let x6 = x3.pow2k(3).mul(&x3);
+            let x9 = x6.pow2k(3).mul(&x3);
+            let x11 = x9.pow2k(2).mul(&x2);
+            let x22 = x11.pow2k(11).mul(&x11);
+            let x44 = x22.pow2k(22).mul(&x22);
+            let x88 = x44.pow2k(44).mul(&x44);
+            let x176 = x88.pow2k(88).mul(&x88);
+            let x220 = x176.pow2k(44).mul(&x44);
+            let x223 = x220.pow2k(3).mul(&x3);
 
-        CtOption::new(res, !self.normalizes_to_zero())
+            // The final result is then assembled using a sliding window over the blocks.
+            let res = x223
+                .pow2k(23)
+                .mul(&x22)
+                .pow2k(5)
+                .mul(self)
+                .pow2k(3)
+                .mul(&x2)
+                .pow2k(2)
+                .mul(self);
+
+            CtOption::new(res, !self.normalizes_to_zero())
+        }
     }
 
     /// Returns the square root of self mod p, or `None` if no square root exists.
@@ -699,6 +707,7 @@ mod tests {
     #[test]
     fn invert() {
         assert!(bool::from(FieldElement::ZERO.invert().is_none()));
+        assert!(bool::from(FieldElement::from_i64(0).invert().is_none()));
 
         let one = FieldElement::ONE;
         assert_eq!(one.invert().unwrap().normalize(), one);

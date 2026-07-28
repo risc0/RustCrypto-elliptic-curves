@@ -134,6 +134,17 @@ impl FieldElement8x32R0 {
         self.mul(&Self::ONE.negate_const())
     }
 
+    /// Returns the multiplicative inverse of self, if self is non-zero.
+    pub fn invert(&self) -> CtOption<Self> {
+        let is_nonzero = !self.normalizes_to_zero();
+        let input = Self::conditional_select(&Self::ONE, self, is_nonzero);
+        let mut output = [0u32; 8];
+
+        risc0_bigint2::field::modinv_256(&input.0.to_words(), &MODULUS.to_words(), &mut output);
+
+        CtOption::new(Self(U256::from_words(output)), is_nonzero)
+    }
+
     /// Returns self + rhs mod p.
     /// Sums the magnitudes.
     pub fn add(&self, rhs: &Self) -> Self {

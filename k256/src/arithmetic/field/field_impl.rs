@@ -91,6 +91,13 @@ impl FieldElementImpl {
         Self::new_weak_normalized(&FieldElementUnsafeImpl::from_i64(w))
     }
 
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    pub(crate) fn invert(&self) -> CtOption<Self> {
+        self.value
+            .invert()
+            .map(|value| Self::new_normalized(&value))
+    }
+
     pub fn from_bytes(bytes: &FieldBytes) -> CtOption<Self> {
         let value = FieldElementUnsafeImpl::from_bytes(bytes);
         CtOption::map(value, |x| Self::new_normalized(&x))
